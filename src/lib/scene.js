@@ -4,7 +4,7 @@ import { buildGlyphAtlas } from "./glyph-atlas.js";
 import roofUrl from "../assets/roof.webp";
 
 const STRING_COUNT = 38;
-const NODES = 28;
+const NODES = 50;
 
 const WORLD_HEIGHT = 10;
 const ROOF_ASPECT = 1400 / 732; // the trimmed artwork's true ratio
@@ -94,7 +94,7 @@ export class TempleStrings {
         bottom: -4,
         nodes: NODES,
         speed: 0.3 + t * 0.1,
-        damping: 0.9968 - t * 0.001,
+        damping: 0.9978 - t * 0.0008,
         freq: freqs[i],
         freeEnd: true,
       });
@@ -239,36 +239,37 @@ export class TempleStrings {
 
     // The roof is capped by height on wide screens and by width on narrow ones,
     // so the pavilion keeps its proportions instead of swallowing the viewport.
-    const roofWidth = Math.min(this.worldWidth * 0.92, WORLD_HEIGHT * 0.5 * ROOF_ASPECT);
+    // The roof and the curtain share one fixed vertical budget, and the roof's
+    // aspect is fixed — so every bit of extra drop for the strands has to come
+    // out of the roof's height. 0.38 is the point where the curtain reads as
+    // taller than it is wide without the pavilion becoming a trinket.
+    const roofWidth = Math.min(this.worldWidth * 0.92, WORLD_HEIGHT * 0.38 * ROOF_ASPECT);
     const roofHeight = roofWidth / ROOF_ASPECT;
-    const roofTop = WORLD_HEIGHT / 2 - 0.3;
+    const roofTop = WORLD_HEIGHT / 2 - 0.05;
     const roofBottom = roofTop - roofHeight;
 
     this.roof.scale.set(roofWidth, roofHeight, 1);
     this.roof.position.set(0, roofBottom + roofHeight / 2, 1);
 
     // Strands hang from the beam, inside the upturned eaves.
-    const span = roofWidth * 0.76;
+    const span = roofWidth * 0.78;
     // Start a little above the roof's lower edge so the tops are hidden behind it.
     this.stringTop = roofBottom + roofHeight * 0.13;
-    this.stringBottom = -WORLD_HEIGHT / 2 + 0.85;
+    this.stringBottom = -WORLD_HEIGHT / 2 + 0.15;
 
-    // Letters must clear their neighbours both across the curtain and down each
-    // strand, so the smaller of the two spacings sets the glyph size.
     const gap = span / (STRING_COUNT - 1);
-    const rowGap = (this.stringTop - this.stringBottom) / (NODES - 1);
-    this.glyphSize = Math.min(gap, rowGap) * 0.98;
+    this.glyphSize = gap * 0.98;
 
     for (const s of this.strings) {
       s.x = -span / 2 + s.slot * span;
       s.top = this.stringTop;
       s.bottom = this.stringBottom;
-      // Strands may lean past their neighbours a little — that overlap is what
-      // a real curtain does — but not so far that the text becomes unreadable.
-      s.maxAmplitude = gap * 1.2;
+      // Strands lean well past their neighbours when swung — that overlap is
+      // what a real curtain does — but not so far that the text is lost.
+      s.maxAmplitude = gap * 2.1;
     }
 
-    this.pushRadius = gap * 5;
+    this.pushRadius = gap * 8;
   }
 
   onPointerMove(e) {
@@ -307,8 +308,10 @@ export class TempleStrings {
    * speed so resting the cursor mid-curtain doesn't pump energy in forever.
    */
   #swayNearby() {
-    const drive = Math.min(0.09, this.pointerSpeed * 0.5);
+    const drive = Math.min(0.4, this.pointerSpeed * 1.5);
     if (drive <= 0.0002) return;
+
+    const reach = NODES * 0.55;
 
     for (const s of this.strings) {
       const index = s.indexAtY(this.pointer.y);
@@ -318,9 +321,13 @@ export class TempleStrings {
       const dist = Math.abs(dx);
       if (dist > this.pushRadius) continue;
 
-      const falloff = smoothstep(this.pushRadius, 0, dist);
+      // Cubed rather than linear, so proximity reads sharply: strands right by
+      // the pointer heave aside while ones further out barely stir.
+      const near = smoothstep(this.pushRadius, 0, dist);
+      const falloff = near * near * near;
+
       const dir = dx >= 0 ? -1 : 1; // pushed away from the pointer
-      s.pluck(index, dir * drive * falloff, 6);
+      s.sway(dir * drive * falloff, index, reach);
     }
   }
 
@@ -352,7 +359,7 @@ export class TempleStrings {
 
       const velocity = Math.min(1, 0.28 + this.pointerSpeed * 1.5);
       const index = s.indexAtY(this.pointer.y);
-      s.pluck(index, -side * 0.16 * velocity, 5);
+      s.pluck(index, -side * 0.16 * velocity, Math.round(NODES * 0.18));
 
       if (this.chime) {
         const pan = this.worldWidth ? (s.x / (this.worldWidth / 2)) * 0.7 : 0;
@@ -369,7 +376,7 @@ export class TempleStrings {
     if (now - s.lastStrike < 1200) return;
 
     s.lastStrike = now;
-    s.pluck(Math.floor(NODES * (0.35 + Math.random() * 0.3)), 0.05, 7);
+    s.pluck(Math.floor(NODES * (0.35 + Math.random() * 0.3)), 0.05, Math.round(NODES * 0.25));
     const pan = this.worldWidth ? (s.x / (this.worldWidth / 2)) * 0.7 : 0;
     this.chime.strike(s.freq, 0.16, pan);
   }

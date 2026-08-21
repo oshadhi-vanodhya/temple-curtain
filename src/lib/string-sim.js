@@ -83,6 +83,30 @@ export class VibratingString {
     }
   }
 
+  /**
+   * A broad, whole-strand push, as opposed to `pluck`'s local pulse.
+   *
+   * A hand moving past a curtain doesn't dent one spot of a strand — it swings
+   * the whole lower length of it. The weight therefore spreads over a large
+   * reach and is biased toward the free bottom end, which is the part of a
+   * hanging strand that travels furthest.
+   */
+  sway(amount, center, reach) {
+    const lastMovable = this.freeEnd ? this.nodes - 1 : this.nodes - 2;
+
+    for (let i = 1; i <= lastMovable; i++) {
+      const d = Math.abs(i - center) / reach;
+      if (d >= 1) continue;
+
+      const bell = 0.5 * (1 + Math.cos(Math.PI * d));
+      // Deeper nodes swing more freely; the top is held by the beam.
+      const depth = 0.35 + 0.65 * (i / lastMovable);
+      const slack = 1 - Math.min(1, Math.abs(this.u[i]) / this.maxAmplitude);
+
+      this.u[i] += amount * bell * depth * (0.3 + 0.7 * slack);
+    }
+  }
+
   step() {
     const { u, uPrev, uNext, nodes, damping } = this;
     const c2 = this.speed * this.speed;
