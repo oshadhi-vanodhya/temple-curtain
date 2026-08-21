@@ -41,6 +41,12 @@ a hanging curtain does. A free end needs a Neumann boundary — the last node co
 its neighbour rather than being held at zero — and without it the sway dies
 completely, because a string clamped at both ends is a harp string, not a curtain.
 
+The strands are also damped like **cloth rather than wire**. With light damping
+each one rang on at its own natural frequency, so moments after a gust they had
+drifted out of phase and the curtain churned, with neighbours leaning opposite
+ways. Heavy damping and a near-uniform wave speed keep the whole curtain
+answering a gust as one sheet and settling together.
+
 Displacement is capped relative to the spacing between neighbours, so no amount of
 frantic input turns the text into an unreadable pile. A strand already under
 tension resists further displacement, so repeated strikes ring it brighter instead
@@ -81,22 +87,21 @@ read as a paragraph instead of as hanging threads.
 
 Two different pointer responses, deliberately kept separate:
 
-- **Near** a strand, it is shoved away — the curtain parts around the pointer as
-  though something solid were pushing through it, and closes again once it
-  leaves. This is a standing field evaluated every frame, *not* driven by pointer
-  speed: an earlier version scaled the push by how fast the cursor moved, which
-  meant a slow approach did nothing at all and you had to swipe to get a
-  reaction. Each node eases toward a target shaped by how near the pointer is,
-  rather than being shoved until it hits its travel ceiling — accumulating a flat
-  shove makes every strand within reach saturate at the same offset and the
-  curtain opens as a flat-sided hole. Push direction comes from each strand's
-  *rest* position, so a strand always retreats to its own side instead of being
-  caught in a tug of war as the pointer crosses it. The nearest strand flies
-  about 28 px, one three along about 12 px, and the corridor opens roughly five
-  strand widths. No sound.
-- A faster flick adds a speed-driven sway on top: a broad whole-strand push
-  weighted toward the free bottom end, since a hanging thing swings along its
-  length rather than denting in one spot.
+- **Near** the curtain, the pointer acts as a **gust of wind**. Every strand
+  leans the *same* way at any instant — only the amount differs. Strands nearest
+  where the gust lands lean furthest and the rest trail off with distance, down
+  to a floor so that even the far edge stirs a little. Direction comes from the
+  pointer's horizontal travel, so dragging left blows the curtain left. The gust
+  outlives the movement that made it and dies over about a second, which lets the
+  curtain swing back and settle on its own instead of snapping straight the
+  moment the pointer stops. A brisk flick leans the nearest hem about 43 px; a
+  slow drift about 7 px. No sound.
+
+  An earlier version pushed strands *away* from the pointer on both sides. That
+  is what a solid object does, and it looked like a hole punched through the
+  fabric rather than cloth moving. Wind has one direction; that single change is
+  what makes it read as a curtain.
+
 - **Across** a strand, it is struck and rings. A strand counts as struck when the
   pointer changes which *side* of it it is on between two frames — comparing
   sides rather than measuring distance means a fast flick still catches every
@@ -112,11 +117,6 @@ The roof's height and the curtain's drop share one fixed vertical budget, and th
 roof artwork's aspect is fixed — so every bit of extra drop for the strands comes
 out of the roof. The split is set where the curtain reads as taller than it is
 wide without the pavilion shrinking to a trinket.
-
-Because strands flee an approaching pointer, drifting in slowly parts the curtain
-in silence while a quick sweep still catches and rings every strand it passes —
-the strands cannot get out of the way in time. That falls out of the two
-behaviours rather than being special-cased.
 
 Left alone for a while, a slow air current occasionally finds one strand.
 

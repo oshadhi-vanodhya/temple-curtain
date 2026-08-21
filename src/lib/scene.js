@@ -15,17 +15,17 @@ const CURTAIN_TEXT = "THE STRINGS REMEMBER EVERY HAND THAT HAS PASSED THROUGH TH
 const REST_COLOR = new THREE.Color("#4a4235");
 const RING_COLOR = new THREE.Color("#c8922f");
 
-// Fraction of the remaining gap to the shaped target a node closes each frame
-// at 60fps — how eagerly strands flee the pointer.
-const REPEL_APPROACH = 0.2;
+// Pointer travel (in world units per move) needed for a full-strength gust.
+const WIND_GAIN = 2.5;
+// How quickly the gust follows the pointer, and how fast it dies once it stops.
+const WIND_SMOOTH = 0.35;
+const WIND_DECAY = 0.986;
+// Fraction of the remaining distance to the wind's target shape a node closes
+// each frame at 60fps.
+const WIND_APPROACH = 0.32;
 
 const STRIKE_COOLDOWN_MS = 70;
 const IDLE_BEFORE_BREEZE_MS = 6500;
-
-function smoothstep(edge0, edge1, x) {
-  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
 
 function pentatonic(count, root = 293.66) {
   const steps = [0, 3, 5, 7, 10];
@@ -56,6 +56,8 @@ export class TempleStrings {
     this.pointerActive = false;
     this.pointerSpeed = 0;
     this.lastMoveAt = 0;
+    // Signed gust strength, -1 (blowing left) to 1 (blowing right).
+    this.wind = 0;
 
     this.strings = [];
     this.stringTop = 0;
@@ -97,8 +99,13 @@ export class TempleStrings {
         top: 0,
         bottom: -4,
         nodes: NODES,
-        speed: 0.3 + t * 0.1,
-        damping: 0.9978 - t * 0.0008,
+        // Cloth, not wire. Light damping let each strand ring on at its own
+        // natural frequency, so after a gust they drifted out of phase and the
+        // curtain churned instead of settling together. Heavy damping keeps the
+        // whole curtain answering the wind as one sheet, and the near-uniform
+        // wave speed stops neighbours separating into different rhythms.
+        speed: 0.33 + t * 0.04,
+        damping: 0.992 - t * 0.0015,
         freq: freqs[i],
         freeEnd: true,
       });
@@ -270,7 +277,7 @@ export class TempleStrings {
       s.bottom = this.stringBottom;
       // Strands lean well past their neighbours when swung — that overlap is
       // what a real curtain does — but not so far that the text is lost.
-      s.maxAmplitude = gap * 4.6;
+      s.maxAmplitude = gap * 5.5;
     }
 
     this.pushRadius = gap * 9;
@@ -297,7 +304,10 @@ export class TempleStrings {
     this.pointerSpeed = this.pointer.distanceTo(this.prevPointer);
     this.lastMoveAt = performance.now();
 
-    this.#swayNearby();
+    const travel = this.pointer.x - this.prevPointer.x;
+    const gust = Math.max(-1, Math.min(1, travel * WIND_GAIN));
+    this.wind += (gust - this.wind) * WIND_SMOOTH;
+
     this.#detectCrossings();
   }
 
@@ -307,80 +317,46 @@ export class TempleStrings {
   }
 
   /**
-   * Strands near the pointer are pushed aside without being struck — the bow
-   * wave you get moving a hand through a hanging curtain. Scaled by pointer
-   * speed so resting the cursor mid-curtain doesn't pump energy in forever.
+   * The pointer is treated as a gust of wind rather than as a solid object.
+   *
+   * The previous model pushed strands away from the pointer on both sides, which
+   * parts the curtain around it — that reads as a hole punched through the
+   * fabric, not as cloth moving. Wind has a single direction: every strand leans
+   * the same way at any instant, and only the *amount* varies. Strands nearest
+   * where the gust lands lean furthest, the rest trail off with distance, and
+   * because neighbours differ only slightly they shear past one another instead
+   * of crossing.
+   *
+   * Direction comes from the pointer's horizontal travel, so dragging left blows
+   * the curtain left. The gust outlives the movement that made it and dies away
+   * over about a second, which is what lets the curtain swing back and settle on
+   * its own rather than snapping straight the moment the pointer stops.
+   *
+   * @param {number} dtScale frame time relative to 60fps.
    */
-  #swayNearby() {
-    const drive = Math.min(0.22, this.pointerSpeed * 1.1);
-    if (drive <= 0.0002) return;
+  #applyWind(dtScale) {
+    this.wind *= Math.pow(WIND_DECAY, dtScale);
+    if (Math.abs(this.wind) < 0.0008) return;
 
-    const reach = NODES * 0.55;
+    // Wide enough that the whole curtain answers a gust, peaked enough that the
+    // strand it lands on clearly leads.
+    const sigma = this.pushRadius * 0.75;
+    const step = Math.min(0.9, WIND_APPROACH * dtScale);
 
     for (const s of this.strings) {
-      const index = s.indexAtY(this.pointer.y);
-      if (index < 0) continue;
-
-      const dx = this.pointer.x - (s.x + s.u[index]);
-      const dist = Math.abs(dx);
-      if (dist > this.pushRadius) continue;
-
-      // Cubed rather than linear, so proximity reads sharply: strands right by
-      // the pointer heave aside while ones further out barely stir.
-      const near = smoothstep(this.pushRadius, 0, dist);
-      const falloff = near * near * near;
-
-      const dir = dx >= 0 ? -1 : 1; // pushed away from the pointer
-      s.sway(dir * drive * falloff, index, reach);
-    }
-  }
-
-  /**
-   * A standing repulsion field around the pointer.
-   *
-   * The speed-driven sway alone meant a slow approach did almost nothing — you
-   * had to swipe to get a reaction. This runs every frame the pointer is over
-   * the curtain regardless of whether it is moving, so strands flee as it comes
-   * near and the curtain parts around it, closing again once it leaves.
-   *
-   * Direction comes from each strand's *rest* position rather than its current
-   * one, so a strand always retreats to its own side and can't be caught in a
-   * tug of war as it crosses the pointer.
-   *
-   * @param {number} dtScale frame time relative to 60fps, so the shove is the
-   *   same strength on a 144Hz display as on a 60Hz one.
-   */
-  #repelFromPointer(dtScale) {
-    if (!this.pointerActive) return;
-
-    const rx = this.pushRadius;
-    const ry = this.pushRadius * 2.2; // the parting is taller than it is wide
-    const span = this.stringTop - this.stringBottom;
-    const step = Math.min(0.9, REPEL_APPROACH * dtScale);
-
-    for (const s of this.strings) {
-      const rest = s.x - this.pointer.x;
-      if (Math.abs(rest) > rx) continue;
-
-      const dir = rest >= 0 ? 1 : -1;
-      const lateralT = 1 - Math.abs(rest) / rx;
-      const lateral = lateralT * lateralT;
+      const d = s.x - this.pointer.x;
+      const near = Math.exp(-(d * d) / (2 * sigma * sigma));
+      // The floor keeps distant strands alive: a gust moves the whole curtain,
+      // just less the further it has to travel.
+      const prox = 0.16 + 0.84 * near;
 
       const lastMovable = s.freeEnd ? s.nodes - 1 : s.nodes - 2;
+      const lean = this.wind * s.maxAmplitude * prox;
+
       for (let i = 1; i <= lastMovable; i++) {
-        const y = this.stringTop - (i / (s.nodes - 1)) * span;
-        const dy = Math.abs(y - this.pointer.y);
-        if (dy > ry) continue;
-
-        const vertT = 1 - dy / ry;
-        const depth = 0.4 + 0.6 * (i / lastMovable);
-
-        // Each node eases toward a target shaped by how near the pointer is,
-        // rather than being shoved until it hits the ceiling. Accumulating a
-        // flat shove instead makes every strand within reach saturate at the
-        // same offset, and the curtain opens as a flat-sided hole; easing to a
-        // shaped target gives a rounded parting that falls away with distance.
-        const target = dir * s.maxAmplitude * lateral * vertT * vertT * depth;
+        // Held at the beam, free at the hem — the classic hanging-cloth curve.
+        const t = i / lastMovable;
+        const target = lean * Math.pow(t, 1.15);
         s.u[i] += (target - s.u[i]) * step;
       }
     }
@@ -502,7 +478,7 @@ export class TempleStrings {
     this.lastFrameAt = now;
 
     this.#breeze(now);
-    this.#repelFromPointer(dtScale);
+    this.#applyWind(dtScale);
     for (const s of this.strings) s.step();
     this.#updateCurtain();
 
