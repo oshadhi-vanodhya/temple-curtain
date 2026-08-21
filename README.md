@@ -94,8 +94,24 @@ Two different pointer responses, deliberately kept separate:
   pointer's horizontal travel, so dragging left blows the curtain left. The gust
   outlives the movement that made it and dies over about a second, which lets the
   curtain swing back and settle on its own instead of snapping straight the
-  moment the pointer stops. A brisk flick leans the nearest hem about 43 px; a
-  slow drift about 7 px. No sound.
+  moment the pointer stops. No sound.
+
+  Gust strength runs through a **compressive curve** rather than scaling linearly
+  with pointer speed. Linearly, a gentle drift was nearly inert while fast moves
+  already clamped at full strength, and raising the gain alone would only have
+  widened that gap — it cannot lift the quiet end without pushing the loud end
+  further into the clamp. An exponent below 1 lifts the quiet end and leaves the
+  loud end where it is:
+
+  | pointer speed | hem leans |
+  |---|---|
+  | very slow drift | 19 px |
+  | slow drift | 28 px |
+  | brisk flick | 63 px |
+
+  Note that the travel ceiling is both the clamp *and* the scale the wind leans
+  against, so raising it buys no headroom — it simply widens every gust in
+  proportion. It is set by how far the strongest gust should throw the hem.
 
   An earlier version pushed strands *away* from the pointer on both sides. That
   is what a solid object does, and it looked like a hole punched through the

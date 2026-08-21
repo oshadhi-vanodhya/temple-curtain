@@ -16,7 +16,14 @@ const REST_COLOR = new THREE.Color("#4a4235");
 const RING_COLOR = new THREE.Color("#c8922f");
 
 // Pointer travel (in world units per move) needed for a full-strength gust.
-const WIND_GAIN = 2.5;
+const WIND_GAIN = 3.2;
+// Compresses the response so gentle movement still stirs the curtain. A linear
+// mapping made slow drifts nearly inert while fast ones were already clamped at
+// full strength — raising the gain alone would only have widened that gap. An
+// exponent below 1 lifts the quiet end and leaves the loud end where it is:
+// a drift a tenth of full speed now reads at about a third of full strength
+// instead of a tenth.
+const WIND_CURVE = 0.45;
 // How quickly the gust follows the pointer, and how fast it dies once it stops.
 const WIND_SMOOTH = 0.35;
 const WIND_DECAY = 0.986;
@@ -275,8 +282,9 @@ export class TempleStrings {
       s.x = -span / 2 + s.slot * span;
       s.top = this.stringTop;
       s.bottom = this.stringBottom;
-      // Strands lean well past their neighbours when swung — that overlap is
-      // what a real curtain does — but not so far that the text is lost.
+      // This is both the clamp and the scale the wind leans against, so raising
+      // it buys no headroom — it just makes every gust proportionally wider. It
+      // is set by how far the strongest gust should throw the hem.
       s.maxAmplitude = gap * 5.5;
     }
 
@@ -305,7 +313,8 @@ export class TempleStrings {
     this.lastMoveAt = performance.now();
 
     const travel = this.pointer.x - this.prevPointer.x;
-    const gust = Math.max(-1, Math.min(1, travel * WIND_GAIN));
+    const strength = Math.min(1, Math.abs(travel) * WIND_GAIN);
+    const gust = Math.sign(travel) * Math.pow(strength, WIND_CURVE);
     this.wind += (gust - this.wind) * WIND_SMOOTH;
 
     this.#detectCrossings();
