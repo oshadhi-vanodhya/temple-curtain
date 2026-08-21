@@ -57,34 +57,6 @@ body {
   height: 100%;
 }
 
-.masthead {
-  position: absolute;
-  top: clamp(1.75rem, 5vh, 3.5rem);
-  left: 0;
-  right: 0;
-  text-align: center;
-  pointer-events: none;
-  user-select: none;
-}
-
-.masthead h1 {
-  margin: 0;
-  font-size: clamp(2.75rem, 9vw, 6.5rem);
-  font-weight: 800;
-  line-height: 0.95em;
-  letter-spacing: -0.03em;
-  color: rgba(74, 66, 53, 0.13);
-}
-
-.sub {
-  margin: 0.35em 0 0;
-  font-size: clamp(0.7rem, 1.4vw, 0.85rem);
-  font-weight: 400;
-  letter-spacing: 0.42em;
-  text-transform: uppercase;
-  color: rgba(74, 66, 53, 0.28);
-}
-
 /* ---- audio gate ---- */
 
 .gate {
@@ -144,7 +116,7 @@ body {
 
 .hint {
   position: absolute;
-  bottom: clamp(2rem, 7vh, 4rem);
+  bottom: clamp(1rem, 3vh, 1.75rem);
   margin: 0;
   font-size: 0.72rem;
   font-weight: 300;

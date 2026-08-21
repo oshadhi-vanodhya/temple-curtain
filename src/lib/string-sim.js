@@ -13,7 +13,7 @@
  * `c` is held below 1 to satisfy the Courant stability condition.
  */
 export class VibratingString {
-  constructor({ x, z = 0, top, bottom, nodes = 48, speed = 0.34, damping = 0.996, freq = 440, maxAmplitude = 0.3 }) {
+  constructor({ x, z = 0, top, bottom, nodes = 48, speed = 0.34, damping = 0.996, freq = 440, maxAmplitude = 0.3, freeEnd = false }) {
     this.x = x;
     this.z = z;
     this.top = top;
@@ -27,6 +27,12 @@ export class VibratingString {
     // swinging toward each other — without it, a frantic sweep piles up enough
     // amplitude for them to visibly cross.
     this.maxAmplitude = maxAmplitude;
+
+    // A curtain strand hangs loose at the bottom. Clamping both ends (a harp
+    // string) kills the sway entirely, so the free end gets a Neumann boundary
+    // instead of a fixed one: the last node simply copies its neighbour, which
+    // lets the tail swing sideways rather than being held at zero.
+    this.freeEnd = freeEnd;
 
     this.u = new Float32Array(nodes);
     this.uPrev = new Float32Array(nodes);
@@ -61,7 +67,8 @@ export class VibratingString {
    * a rounded pulse instead of a single-sample spike that would read as a click.
    */
   pluck(index, amount, width = 4) {
-    if (index < 1 || index > this.nodes - 2) return;
+    const lastMovable = this.freeEnd ? this.nodes - 1 : this.nodes - 2;
+    if (index < 1 || index > lastMovable) return;
 
     // An already-taut string resists further displacement, so repeated strikes
     // ring it brighter rather than pushing it ever wider.
@@ -70,7 +77,7 @@ export class VibratingString {
 
     for (let o = -width; o <= width; o++) {
       const i = index + o;
-      if (i < 1 || i > this.nodes - 2) continue;
+      if (i < 1 || i > lastMovable) continue;
       const falloff = 0.5 * (1 + Math.cos((Math.PI * o) / (width + 1)));
       this.u[i] += scaled * falloff;
     }
@@ -81,9 +88,8 @@ export class VibratingString {
     const c2 = this.speed * this.speed;
     const max = this.maxAmplitude;
 
-    // Ends stay pinned — that boundary is what reflects the wave.
+    // The top stays pinned to the roof beam — that boundary reflects the wave.
     uNext[0] = 0;
-    uNext[nodes - 1] = 0;
 
     let energy = 0;
     for (let i = 1; i < nodes - 1; i++) {
@@ -95,6 +101,10 @@ export class VibratingString {
       uNext[i] = next;
       energy += Math.abs(next - u[i]);
     }
+
+    // Resolve the bottom boundary after the interior, since the free case reads
+    // the neighbour's freshly computed value.
+    uNext[nodes - 1] = this.freeEnd ? uNext[nodes - 2] : 0;
 
     // Rotate the three buffers instead of allocating new ones each frame.
     this.uPrev = u;

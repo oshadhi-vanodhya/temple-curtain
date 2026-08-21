@@ -58,11 +58,6 @@ export default function StringInstrument() {
         onPointerMove={() => armed && !touched && setTouched(true)}
       />
 
-      <header className="masthead" aria-hidden="true">
-        <h1>Temple</h1>
-        <p className="sub">nineteen strings</p>
-      </header>
-
       {!armed && (
         <button className="gate" onClick={arm} type="button">
           <span className="gate-ring" />

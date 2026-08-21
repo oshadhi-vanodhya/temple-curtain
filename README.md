@@ -1,11 +1,13 @@
-# Temple — nineteen strings
+# Temple — a curtain of letters
 
-An interactive instrument in React and three.js. Nineteen taut strings hang in a
-still, creme-lit room. Move the pointer across them and each one you cross rings
-with a struck-metal chime and carries a visible wave up and down its length.
+An interactive instrument in React and three.js. Thirty-eight strands of letters
+hang from a temple roof like a beaded curtain, in a still, creme-lit room. Move
+the pointer near them and they sway aside; move it *through* them and each strand
+you cross rings with a struck-metal chime and carries a visible wave down its
+length, the letters tilting as it passes.
 
-Everything is generated at runtime — no audio files, no textures, no network
-requests beyond the webfont.
+The sound is generated at runtime — no audio files. The only binary asset is the
+roof.
 
 ## Run it
 
@@ -20,7 +22,7 @@ start every `AudioContext` suspended and only a real user gesture may resume it.
 
 ## How it works
 
-**`src/lib/string-sim.js` — the strings.**
+**`src/lib/string-sim.js` — the strands.**
 Each string solves the 1D wave equation along its length rather than simulating
 free 2D particles:
 
@@ -34,10 +36,15 @@ ends, reflect, and interfere on the way back, which is what makes the motion rea
 as a *string* rather than a wobbling rope. `c` is held below 1 to satisfy the
 Courant stability condition.
 
-Displacement is capped at 36% of the spacing between neighbours, so no amount of
-frantic input can make two strings visually cross. A string already under tension
-resists further displacement, so repeated strikes ring it brighter instead of
-pushing it ever wider.
+Each strand is pinned at the roof beam but **free at the bottom**, which is what
+a hanging curtain does. A free end needs a Neumann boundary — the last node copies
+its neighbour rather than being held at zero — and without it the sway dies
+completely, because a string clamped at both ends is a harp string, not a curtain.
+
+Displacement is capped relative to the spacing between neighbours, so no amount of
+frantic input turns the text into an unreadable pile. A strand already under
+tension resists further displacement, so repeated strikes ring it brighter instead
+of pushing it ever wider.
 
 **`src/lib/chime.js` — the sound.**
 A struck bowl is *inharmonic*: its partials are not integer multiples of the
@@ -52,24 +59,47 @@ Reverb is a `ConvolverNode` fed a procedurally generated impulse: decaying stere
 noise plus a few sparse early reflections, so it reads as a stone hall instead of
 flat noise.
 
-The strings are tuned to a minor pentatonic from D4 (294 Hz) up to 3520 Hz. Any
+The strands are tuned to a minor pentatonic from D4 (294 Hz) up to 3520 Hz. Any
 two notes in that set are consonant, so dragging across the whole array at speed
 still resolves as music rather than a pile-up. Gain tilts down toward the top of
 the range, because our hearing peaks around 3–4 kHz and equal-amplitude sines get
 harsh as they climb.
 
-**`src/lib/scene.js` — the scene.**
-An orthographic three.js camera with `Line2` for real line width (plain GL lines
-are locked to 1px on most platforms). A string is struck when the pointer changes
-which *side* of it it is on between two frames — comparing sides rather than
-measuring distance means a fast flick still registers every string it passed
-through, instead of skipping the ones that fell between two pointer samples.
+**`src/lib/glyph-atlas.js` + `src/lib/scene.js` — the curtain.**
+Every distinct character is packed into a single canvas atlas, so the whole
+curtain draws in **one draw call** rather than one per letter. Each glyph is a
+quad whose four corners are rewritten every frame from its strand's current
+shape, and each letter is rotated to the strand's *local* angle — so the text
+bends with the wave instead of sliding along a rigid column. Glyphs are painted
+white and tinted per-vertex, which is how a ringing strand warms toward gold
+without needing its own material. Spaces become real gaps: no quad is emitted
+for them at all.
 
-Left alone for a while, a slow air current occasionally finds one string.
+The text reads *down* each strand rather than across the rows, with neighbouring
+strands offset from one another — indexing it the other way makes the curtain
+read as a paragraph instead of as hanging threads.
+
+Two different pointer responses, deliberately kept separate:
+
+- **Near** a strand, it is pushed aside — the bow wave of a hand moving through
+  a hanging curtain. Scaled by pointer speed, so resting the cursor mid-curtain
+  doesn't pump energy in forever. No sound.
+- **Across** a strand, it is struck and rings. A strand counts as struck when the
+  pointer changes which *side* of it it is on between two frames — comparing
+  sides rather than measuring distance means a fast flick still catches every
+  strand it passed through, instead of skipping the ones that fell between two
+  pointer samples.
+
+The roof is drawn last with `depthTest` off, so the strands appear to hang from
+behind the beam. Its size is capped by height on wide screens and by width on
+narrow ones, so the pavilion keeps its proportions instead of swallowing the
+viewport.
+
+Left alone for a while, a slow air current occasionally finds one strand.
 
 ## Notes
 
 - Pointer events throughout, so it works with touch and pen as well as a mouse.
-- Voices are capped at 40 and the ceiling is a safety valve, not a normal limit —
-  one full sweep is 19 simultaneous voices and sweeps overlap.
+- Voices are capped at 56 and the ceiling is a safety valve, not a normal limit —
+  one full sweep is 38 simultaneous voices and sweeps overlap.
 - `prefers-reduced-motion` is honoured for the UI animation.

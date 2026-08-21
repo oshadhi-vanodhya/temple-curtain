@@ -17,10 +17,10 @@ const PARTIALS = [
   { ratio: 7.12, gain: 0.08, decay: 0.22 },
 ];
 
-// A single sweep across all 19 strings is 19 simultaneous voices, and sweeps
+// A single sweep across all 38 strands is 38 simultaneous voices, and sweeps
 // overlap — so the ceiling has to clear that comfortably, or the user hears
 // their own gesture come up silent.
-const MAX_VOICES = 40;
+const MAX_VOICES = 56;
 
 /** Decaying stereo noise — a convolution impulse that reads as a stone hall. */
 function buildImpulse(ctx, seconds = 3.2, decay = 2.6) {
@@ -122,7 +122,7 @@ export class ChimeEngine {
     const tilt = 1 - Math.min(0.42, Math.max(0, (freq - 700) / 5200));
 
     const voice = ctx.createGain();
-    voice.gain.value = 0.16 * v * tilt;
+    voice.gain.value = 0.115 * v * tilt;
 
     const panner = ctx.createStereoPanner();
     panner.pan.value = Math.max(-1, Math.min(1, pan));
