@@ -15,6 +15,10 @@ const CURTAIN_TEXT = "THE STRINGS REMEMBER EVERY HAND THAT HAS PASSED THROUGH TH
 const REST_COLOR = new THREE.Color("#4a4235");
 const RING_COLOR = new THREE.Color("#c8922f");
 
+// Fraction of the remaining gap to the shaped target a node closes each frame
+// at 60fps — how eagerly strands flee the pointer.
+const REPEL_APPROACH = 0.2;
+
 const STRIKE_COOLDOWN_MS = 70;
 const IDLE_BEFORE_BREEZE_MS = 6500;
 
@@ -266,10 +270,10 @@ export class TempleStrings {
       s.bottom = this.stringBottom;
       // Strands lean well past their neighbours when swung — that overlap is
       // what a real curtain does — but not so far that the text is lost.
-      s.maxAmplitude = gap * 2.1;
+      s.maxAmplitude = gap * 4.6;
     }
 
-    this.pushRadius = gap * 8;
+    this.pushRadius = gap * 9;
   }
 
   onPointerMove(e) {
@@ -308,7 +312,7 @@ export class TempleStrings {
    * speed so resting the cursor mid-curtain doesn't pump energy in forever.
    */
   #swayNearby() {
-    const drive = Math.min(0.4, this.pointerSpeed * 1.5);
+    const drive = Math.min(0.22, this.pointerSpeed * 1.1);
     if (drive <= 0.0002) return;
 
     const reach = NODES * 0.55;
@@ -328,6 +332,57 @@ export class TempleStrings {
 
       const dir = dx >= 0 ? -1 : 1; // pushed away from the pointer
       s.sway(dir * drive * falloff, index, reach);
+    }
+  }
+
+  /**
+   * A standing repulsion field around the pointer.
+   *
+   * The speed-driven sway alone meant a slow approach did almost nothing — you
+   * had to swipe to get a reaction. This runs every frame the pointer is over
+   * the curtain regardless of whether it is moving, so strands flee as it comes
+   * near and the curtain parts around it, closing again once it leaves.
+   *
+   * Direction comes from each strand's *rest* position rather than its current
+   * one, so a strand always retreats to its own side and can't be caught in a
+   * tug of war as it crosses the pointer.
+   *
+   * @param {number} dtScale frame time relative to 60fps, so the shove is the
+   *   same strength on a 144Hz display as on a 60Hz one.
+   */
+  #repelFromPointer(dtScale) {
+    if (!this.pointerActive) return;
+
+    const rx = this.pushRadius;
+    const ry = this.pushRadius * 2.2; // the parting is taller than it is wide
+    const span = this.stringTop - this.stringBottom;
+    const step = Math.min(0.9, REPEL_APPROACH * dtScale);
+
+    for (const s of this.strings) {
+      const rest = s.x - this.pointer.x;
+      if (Math.abs(rest) > rx) continue;
+
+      const dir = rest >= 0 ? 1 : -1;
+      const lateralT = 1 - Math.abs(rest) / rx;
+      const lateral = lateralT * lateralT;
+
+      const lastMovable = s.freeEnd ? s.nodes - 1 : s.nodes - 2;
+      for (let i = 1; i <= lastMovable; i++) {
+        const y = this.stringTop - (i / (s.nodes - 1)) * span;
+        const dy = Math.abs(y - this.pointer.y);
+        if (dy > ry) continue;
+
+        const vertT = 1 - dy / ry;
+        const depth = 0.4 + 0.6 * (i / lastMovable);
+
+        // Each node eases toward a target shaped by how near the pointer is,
+        // rather than being shoved until it hits the ceiling. Accumulating a
+        // flat shove instead makes every strand within reach saturate at the
+        // same offset, and the curtain opens as a flat-sided hole; easing to a
+        // shaped target gives a rounded parting that falls away with distance.
+        const target = dir * s.maxAmplitude * lateral * vertT * vertT * depth;
+        s.u[i] += (target - s.u[i]) * step;
+      }
     }
   }
 
@@ -442,7 +497,12 @@ export class TempleStrings {
     const now = performance.now();
     const elapsed = (now - this.startedAt) / 1000;
 
+    // Normalised against 60fps so the shove doesn't scale with refresh rate.
+    const dtScale = this.lastFrameAt ? Math.min(3, (now - this.lastFrameAt) / 16.667) : 1;
+    this.lastFrameAt = now;
+
     this.#breeze(now);
+    this.#repelFromPointer(dtScale);
     for (const s of this.strings) s.step();
     this.#updateCurtain();
 

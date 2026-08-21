@@ -81,13 +81,22 @@ read as a paragraph instead of as hanging threads.
 
 Two different pointer responses, deliberately kept separate:
 
-- **Near** a strand, it is pushed aside — the bow wave of a hand moving through
-  a hanging curtain. This is a broad, whole-strand push weighted toward the free
-  bottom end, not a local dent, because that is how a hanging thing actually
-  moves. The falloff with distance is *cubed*, so proximity reads sharply: a
-  strand right by the pointer heaves about 30 px aside while one three along
-  stirs only 10 px and one seven along not at all. Scaled by pointer speed, so
-  resting the cursor mid-curtain doesn't pump energy in forever. No sound.
+- **Near** a strand, it is shoved away — the curtain parts around the pointer as
+  though something solid were pushing through it, and closes again once it
+  leaves. This is a standing field evaluated every frame, *not* driven by pointer
+  speed: an earlier version scaled the push by how fast the cursor moved, which
+  meant a slow approach did nothing at all and you had to swipe to get a
+  reaction. Each node eases toward a target shaped by how near the pointer is,
+  rather than being shoved until it hits its travel ceiling — accumulating a flat
+  shove makes every strand within reach saturate at the same offset and the
+  curtain opens as a flat-sided hole. Push direction comes from each strand's
+  *rest* position, so a strand always retreats to its own side instead of being
+  caught in a tug of war as the pointer crosses it. The nearest strand flies
+  about 28 px, one three along about 12 px, and the corridor opens roughly five
+  strand widths. No sound.
+- A faster flick adds a speed-driven sway on top: a broad whole-strand push
+  weighted toward the free bottom end, since a hanging thing swings along its
+  length rather than denting in one spot.
 - **Across** a strand, it is struck and rings. A strand counts as struck when the
   pointer changes which *side* of it it is on between two frames — comparing
   sides rather than measuring distance means a fast flick still catches every
@@ -103,6 +112,11 @@ The roof's height and the curtain's drop share one fixed vertical budget, and th
 roof artwork's aspect is fixed — so every bit of extra drop for the strands comes
 out of the roof. The split is set where the curtain reads as taller than it is
 wide without the pavilion shrinking to a trinket.
+
+Because strands flee an approaching pointer, drifting in slowly parts the curtain
+in silence while a quick sweep still catches and rings every strand it passes —
+the strands cannot get out of the way in time. That falls out of the two
+behaviours rather than being special-cased.
 
 Left alone for a while, a slow air current occasionally finds one strand.
 
