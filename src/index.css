@@ -1,0 +1,172 @@
+@import url("https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&display=swap");
+
+:root {
+  /* A warm creme, not a grey — the whole scene is lit off this. */
+  --creme: #f4efe3;
+  --creme-deep: #e9e1d0;
+  --ink: #4a4235;
+  --ink-soft: rgba(74, 66, 53, 0.55);
+  --gold: #c8922f;
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--creme);
+  font-family: Rubik, system-ui, -apple-system, sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Light pooling in the centre, falling off to the corners. */
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 42%, #fbf7ee 0%, var(--creme) 45%, var(--creme-deep) 100%);
+}
+
+.canvas-host {
+  position: absolute;
+  inset: 0;
+  /* Stops mobile browsers stealing the drag for scroll/zoom. */
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.canvas-host canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.masthead {
+  position: absolute;
+  top: clamp(1.75rem, 5vh, 3.5rem);
+  left: 0;
+  right: 0;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.masthead h1 {
+  margin: 0;
+  font-size: clamp(2.75rem, 9vw, 6.5rem);
+  font-weight: 800;
+  line-height: 0.95em;
+  letter-spacing: -0.03em;
+  color: rgba(74, 66, 53, 0.13);
+}
+
+.sub {
+  margin: 0.35em 0 0;
+  font-size: clamp(0.7rem, 1.4vw, 0.85rem);
+  font-weight: 400;
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: rgba(74, 66, 53, 0.28);
+}
+
+/* ---- audio gate ---- */
+
+.gate {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgba(244, 239, 227, 0.72);
+  backdrop-filter: blur(3px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.4rem;
+  font-family: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  z-index: 3;
+  animation: fade-in 0.7s ease both;
+}
+
+.gate-ring {
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  border: 1px solid rgba(200, 146, 47, 0.5);
+  position: relative;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gate-ring::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1px solid rgba(200, 146, 47, 0.35);
+  animation: pulse 3.2s ease-out infinite;
+}
+
+.gate:hover .gate-ring {
+  transform: scale(1.08);
+}
+
+.gate-label {
+  font-size: clamp(0.95rem, 2vw, 1.15rem);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.gate-note {
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.hint {
+  position: absolute;
+  bottom: clamp(2rem, 7vh, 4rem);
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 300;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  pointer-events: none;
+  animation: fade-in 1.4s ease 0.3s both;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  70% { transform: scale(1.55); opacity: 0; }
+  100% { transform: scale(1.55); opacity: 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gate-ring::after { animation: none; }
+  .gate, .hint { animation: none; }
+}
