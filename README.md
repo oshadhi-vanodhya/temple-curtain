@@ -6,8 +6,8 @@ still, creme-lit room. Move the pointer near them and they heave aside; move it
 *through* them and each strand you cross rings with a struck-metal chime and
 carries a visible wave down its length, the letters tilting as it passes.
 
-The sound is generated at runtime — no audio files. The only binary asset is the
-roof.
+The sound is generated at runtime — no audio files. The only binary assets are the
+roof and the painted backdrop.
 
 ## Run it
 
@@ -70,6 +70,21 @@ two notes in that set are consonant, so dragging across the whole array at speed
 still resolves as music rather than a pile-up. Gain tilts down toward the top of
 the range, because our hearing peaks around 3–4 kHz and equal-amplitude sines get
 harsh as they climb.
+
+**The backdrop.**
+The painting is shown *whole*, never cropped. Its ruled border and corner motifs
+are part of the image, and `background-size: cover` would slice the top and
+bottom ones off while leaving the sides, which reads as broken rather than
+full-bleed. So it is fitted with `contain` and the page ground is set to the
+painting's own outer edge tone, letting the letterboxed margins continue it.
+
+The scene is then composed inside *that panel* rather than inside the viewport —
+the same 4:3 fit is recomputed in world space, so the pavilion stays within the
+painted frame instead of drifting over the letterboxing. Layout is driven by a
+`ResizeObserver` plus a per-frame box check, not the window `resize` event: the
+container's box can change without that event reaching the handler, and a missed
+layout leaves the scene mis-scaled and visibly off-register from the painting
+behind it.
 
 **`src/lib/glyph-atlas.js` + `src/lib/scene.js` — the curtain.**
 Every distinct character is packed into a single canvas atlas, so the whole

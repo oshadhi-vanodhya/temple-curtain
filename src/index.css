@@ -1,9 +1,9 @@
 @import url("https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&display=swap");
 
 :root {
-  /* A warm creme, not a grey — the whole scene is lit off this. */
-  --creme: #f4efe3;
-  --creme-deep: #e9e1d0;
+  /* Taken from the backdrop painting's own outer edge, so the letterboxed
+     margins around it continue the artwork instead of framing it. */
+  --creme: #f1dfc6;
   --ink: #4a4235;
   --ink-soft: rgba(74, 66, 53, 0.55);
   --gold: #c8922f;
@@ -38,9 +38,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Light pooling in the centre, falling off to the corners. */
-  background:
-    radial-gradient(ellipse 70% 55% at 50% 42%, #fbf7ee 0%, var(--creme) 45%, var(--creme-deep) 100%);
+  /* The painting is shown whole, never cropped: its ruled border and corner
+     motifs are part of the image, and `cover` would slice the top and bottom
+     ones off while leaving the sides — which reads as broken rather than
+     full-bleed. The scene is laid out inside this panel to match. */
+  background-color: var(--creme);
+  background-image: url("./assets/backdrop.webp");
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .canvas-host {
@@ -64,7 +70,7 @@ body {
   inset: 0;
   width: 100%;
   border: 0;
-  background: rgba(244, 239, 227, 0.72);
+  background: rgba(243, 232, 214, 0.74);
   backdrop-filter: blur(3px);
   display: flex;
   flex-direction: column;
@@ -114,19 +120,6 @@ body {
   color: var(--ink-soft);
 }
 
-.hint {
-  position: absolute;
-  bottom: clamp(1rem, 3vh, 1.75rem);
-  margin: 0;
-  font-size: 0.72rem;
-  font-weight: 300;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  pointer-events: none;
-  animation: fade-in 1.4s ease 0.3s both;
-}
-
 @keyframes pulse {
   0% { transform: scale(1); opacity: 0.8; }
   70% { transform: scale(1.55); opacity: 0; }
@@ -140,5 +133,5 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .gate-ring::after { animation: none; }
-  .gate, .hint { animation: none; }
+  .gate { animation: none; }
 }

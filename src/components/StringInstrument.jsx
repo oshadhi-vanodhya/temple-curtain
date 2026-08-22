@@ -8,7 +8,6 @@ export default function StringInstrument() {
   const chimeRef = useRef(null);
 
   const [armed, setArmed] = useState(false);
-  const [touched, setTouched] = useState(false);
 
   useEffect(() => {
     const scene = new TempleStrings(containerRef.current);
@@ -52,11 +51,7 @@ export default function StringInstrument() {
 
   return (
     <div className="stage">
-      <div
-        className="canvas-host"
-        ref={containerRef}
-        onPointerMove={() => armed && !touched && setTouched(true)}
-      />
+      <div className="canvas-host" ref={containerRef} />
 
       {!armed && (
         <button className="gate" onClick={arm} type="button">
@@ -64,10 +59,6 @@ export default function StringInstrument() {
           <span className="gate-label">Touch to wake the strings</span>
           <span className="gate-note">sound on</span>
         </button>
-      )}
-
-      {armed && !touched && (
-        <p className="hint">Move across the strings</p>
       )}
     </div>
   );

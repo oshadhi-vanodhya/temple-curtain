@@ -8,6 +8,11 @@ const NODES = 50;
 
 const WORLD_HEIGHT = 10;
 const ROOF_ASPECT = 1400 / 732; // the trimmed artwork's true ratio
+// The backdrop painting is shown whole (CSS `background-size: contain`), so on
+// most viewports it occupies a centred 4:3 panel narrower than the window. The
+// scene is composed inside that panel rather than the viewport, so the pavilion
+// stays within the painted frame instead of drifting over the letterboxing.
+const BACKDROP_ASPECT = 1448 / 1086;
 
 /** The text the curtain is woven from; it repeats across strands. */
 const CURTAIN_TEXT = "THE STRINGS REMEMBER EVERY HAND THAT HAS PASSED THROUGH THEM ";
@@ -81,7 +86,13 @@ export class TempleStrings {
     this.onPointerLeave = this.onPointerLeave.bind(this);
     this.tick = this.tick.bind(this);
 
-    window.addEventListener("resize", this.onResize);
+    // A ResizeObserver rather than window's resize event: the scene has to stay
+    // pinned to the CSS-painted backdrop panel, and the container's box can
+    // change without a window resize firing — which leaves the world scale stale
+    // and the pavilion misaligned against the painting behind it.
+    this.resizeObserver = new ResizeObserver(() => this.onResize());
+    this.resizeObserver.observe(container);
+
     container.addEventListener("pointermove", this.onPointerMove);
     container.addEventListener("pointerleave", this.onPointerLeave);
 
@@ -216,8 +227,10 @@ export class TempleStrings {
     const positions = new Float32Array(count * 3);
     this.dustSeeds = new Float32Array(count);
 
+    this.dustNorm = new Float32Array(count);
     for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 24;
+      this.dustNorm[i] = Math.random() - 0.5;
+      positions[i * 3] = 0; // real x is assigned in layout(), from the panel width
       positions[i * 3 + 1] = (Math.random() - 0.5) * WORLD_HEIGHT;
       positions[i * 3 + 2] = -1;
       this.dustSeeds[i] = Math.random() * Math.PI * 2;
@@ -244,6 +257,7 @@ export class TempleStrings {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
 
+    this.laidOutAt = w * 100000 + h;
     this.renderer.setSize(w, h);
 
     const aspect = w / h;
@@ -257,13 +271,21 @@ export class TempleStrings {
 
     // The roof is capped by height on wide screens and by width on narrow ones,
     // so the pavilion keeps its proportions instead of swallowing the viewport.
+    // Mirror the CSS `contain` fit exactly, so the world-space panel and the
+    // painted one are the same rectangle.
+    const panelHeight = Math.min(WORLD_HEIGHT, this.worldWidth / BACKDROP_ASPECT);
+    const panelWidth = panelHeight * BACKDROP_ASPECT;
+    this.panelHeight = panelHeight;
+    this.panelWidth = panelWidth;
+
     // The roof and the curtain share one fixed vertical budget, and the roof's
     // aspect is fixed — so every bit of extra drop for the strands has to come
     // out of the roof's height. 0.38 is the point where the curtain reads as
     // taller than it is wide without the pavilion becoming a trinket.
-    const roofWidth = Math.min(this.worldWidth * 0.92, WORLD_HEIGHT * 0.38 * ROOF_ASPECT);
+    const roofWidth = Math.min(panelWidth * 0.92, panelHeight * 0.38 * ROOF_ASPECT);
     const roofHeight = roofWidth / ROOF_ASPECT;
-    const roofTop = WORLD_HEIGHT / 2 - 0.05;
+    // Clear of the painting's ruled border at the top.
+    const roofTop = panelHeight / 2 - panelHeight * 0.02;
     const roofBottom = roofTop - roofHeight;
 
     this.roof.scale.set(roofWidth, roofHeight, 1);
@@ -273,7 +295,9 @@ export class TempleStrings {
     const span = roofWidth * 0.78;
     // Start a little above the roof's lower edge so the tops are hidden behind it.
     this.stringTop = roofBottom + roofHeight * 0.13;
-    this.stringBottom = -WORLD_HEIGHT / 2 + 0.15;
+    // The curtain hangs over the open water at the painting's centre, so it can
+    // run low without fouling the blossoms in the bottom corners.
+    this.stringBottom = -panelHeight / 2 + panelHeight * 0.03;
 
     const gap = span / (STRING_COUNT - 1);
     this.glyphSize = gap * 0.98;
@@ -289,6 +313,13 @@ export class TempleStrings {
     }
 
     this.pushRadius = gap * 9;
+
+    // Motes drift within the frame, not across the letterboxing.
+    const dustPos = this.dust.geometry.attributes.position;
+    for (let i = 0; i < this.dustNorm.length; i++) {
+      dustPos.array[i * 3] = this.dustNorm[i] * panelWidth * 0.96;
+    }
+    dustPos.needsUpdate = true;
   }
 
   onPointerMove(e) {
@@ -479,6 +510,14 @@ export class TempleStrings {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.tick);
 
+    // Belt and braces. The scene has to stay registered with the CSS-painted
+    // backdrop, and a missed layout leaves the pavilion floating off the
+    // painting — so confirm the box every frame rather than trusting that a
+    // resize notification always arrives.
+    const cw = this.container.clientWidth;
+    const ch = this.container.clientHeight;
+    if (cw && ch && cw * 100000 + ch !== this.laidOutAt) this.onResize();
+
     const now = performance.now();
     const elapsed = (now - this.startedAt) / 1000;
 
@@ -496,8 +535,8 @@ export class TempleStrings {
       const seed = this.dustSeeds[i];
       dustPos.array[i * 3] += Math.sin(elapsed * 0.12 + seed) * 0.0009;
       dustPos.array[i * 3 + 1] += 0.0016 + Math.cos(elapsed * 0.09 + seed) * 0.0006;
-      if (dustPos.array[i * 3 + 1] > WORLD_HEIGHT / 2) {
-        dustPos.array[i * 3 + 1] = -WORLD_HEIGHT / 2;
+      if (dustPos.array[i * 3 + 1] > this.panelHeight / 2) {
+        dustPos.array[i * 3 + 1] = -this.panelHeight / 2;
       }
     }
     dustPos.needsUpdate = true;
@@ -509,7 +548,7 @@ export class TempleStrings {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
 
-    window.removeEventListener("resize", this.onResize);
+    this.resizeObserver.disconnect();
     this.container.removeEventListener("pointermove", this.onPointerMove);
     this.container.removeEventListener("pointerleave", this.onPointerLeave);
 
