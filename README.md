@@ -72,19 +72,17 @@ the range, because our hearing peaks around 3–4 kHz and equal-amplitude sines 
 harsh as they climb.
 
 **The backdrop.**
-The painting is shown *whole*, never cropped. Its ruled border and corner motifs
-are part of the image, and `background-size: cover` would slice the top and
-bottom ones off while leaving the sides, which reads as broken rather than
-full-bleed. So it is fitted with `contain` and the page ground is set to the
-painting's own outer edge tone, letting the letterboxed margins continue it.
+The painting runs the full width of the viewport and is pinned to the bottom
+edge. It is 4:3, so at full width it stands taller than the window and its sky is
+cropped off the top — which is the intent: the mountains, blossoms and ruled
+lower border sit along the bottom of the frame at full size.
 
-The scene is then composed inside *that panel* rather than inside the viewport —
-the same 4:3 fit is recomputed in world space, so the pavilion stays within the
-painted frame instead of drifting over the letterboxing. Layout is driven by a
-`ResizeObserver` plus a per-frame box check, not the window `resize` event: the
-container's box can change without that event reaching the handler, and a missed
-layout leaves the scene mis-scaled and visibly off-register from the painting
-behind it.
+Because nothing is letterboxed, the scene is composed against the viewport
+itself; only the curtain's lower margin answers to the painting, stopping just
+above the ruled border. Layout is driven by a `ResizeObserver` plus a per-frame
+box check rather than the window `resize` event — that event was observed not to
+reach the handler after a viewport change, leaving the world scale stale and the
+scene visibly mis-sized.
 
 **`src/lib/glyph-atlas.js` + `src/lib/scene.js` — the curtain.**
 Every distinct character is packed into a single canvas atlas, so the whole

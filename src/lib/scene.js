@@ -269,23 +269,21 @@ export class TempleStrings {
     this.camera.bottom = -WORLD_HEIGHT / 2;
     this.camera.updateProjectionMatrix();
 
-    // The roof is capped by height on wide screens and by width on narrow ones,
-    // so the pavilion keeps its proportions instead of swallowing the viewport.
-    // Mirror the CSS `contain` fit exactly, so the world-space panel and the
-    // painted one are the same rectangle.
-    const panelHeight = Math.min(WORLD_HEIGHT, this.worldWidth / BACKDROP_ASPECT);
-    const panelWidth = panelHeight * BACKDROP_ASPECT;
-    this.panelHeight = panelHeight;
-    this.panelWidth = panelWidth;
+    // The backdrop runs the full width and is pinned to the bottom edge, so it
+    // stands taller than the viewport and its top is cropped. Nothing is
+    // letterboxed any more, so the scene is composed against the viewport
+    // itself; only the lower margin still answers to the painting, whose ruled
+    // border sits just inside the bottom edge.
+    this.panelWidth = this.worldWidth;
+    this.panelHeight = this.worldWidth / BACKDROP_ASPECT;
 
     // The roof and the curtain share one fixed vertical budget, and the roof's
     // aspect is fixed — so every bit of extra drop for the strands has to come
     // out of the roof's height. 0.38 is the point where the curtain reads as
     // taller than it is wide without the pavilion becoming a trinket.
-    const roofWidth = Math.min(panelWidth * 0.92, panelHeight * 0.38 * ROOF_ASPECT);
+    const roofWidth = Math.min(this.worldWidth * 0.92, WORLD_HEIGHT * 0.38 * ROOF_ASPECT);
     const roofHeight = roofWidth / ROOF_ASPECT;
-    // Clear of the painting's ruled border at the top.
-    const roofTop = panelHeight / 2 - panelHeight * 0.02;
+    const roofTop = WORLD_HEIGHT / 2 - 0.2;
     const roofBottom = roofTop - roofHeight;
 
     this.roof.scale.set(roofWidth, roofHeight, 1);
@@ -295,9 +293,9 @@ export class TempleStrings {
     const span = roofWidth * 0.78;
     // Start a little above the roof's lower edge so the tops are hidden behind it.
     this.stringTop = roofBottom + roofHeight * 0.13;
-    // The curtain hangs over the open water at the painting's centre, so it can
-    // run low without fouling the blossoms in the bottom corners.
-    this.stringBottom = -panelHeight / 2 + panelHeight * 0.03;
+    // The curtain hangs over the open water at the painting's centre, clear of
+    // the blossoms in the corners, stopping just above the ruled lower border.
+    this.stringBottom = -WORLD_HEIGHT / 2 + 0.35;
 
     const gap = span / (STRING_COUNT - 1);
     this.glyphSize = gap * 0.98;
@@ -314,10 +312,9 @@ export class TempleStrings {
 
     this.pushRadius = gap * 9;
 
-    // Motes drift within the frame, not across the letterboxing.
     const dustPos = this.dust.geometry.attributes.position;
     for (let i = 0; i < this.dustNorm.length; i++) {
-      dustPos.array[i * 3] = this.dustNorm[i] * panelWidth * 0.96;
+      dustPos.array[i * 3] = this.dustNorm[i] * this.worldWidth;
     }
     dustPos.needsUpdate = true;
   }
@@ -535,8 +532,8 @@ export class TempleStrings {
       const seed = this.dustSeeds[i];
       dustPos.array[i * 3] += Math.sin(elapsed * 0.12 + seed) * 0.0009;
       dustPos.array[i * 3 + 1] += 0.0016 + Math.cos(elapsed * 0.09 + seed) * 0.0006;
-      if (dustPos.array[i * 3 + 1] > this.panelHeight / 2) {
-        dustPos.array[i * 3 + 1] = -this.panelHeight / 2;
+      if (dustPos.array[i * 3 + 1] > WORLD_HEIGHT / 2) {
+        dustPos.array[i * 3 + 1] = -WORLD_HEIGHT / 2;
       }
     }
     dustPos.needsUpdate = true;

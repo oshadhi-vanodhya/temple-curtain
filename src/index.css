@@ -38,14 +38,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* The painting is shown whole, never cropped: its ruled border and corner
-     motifs are part of the image, and `cover` would slice the top and bottom
-     ones off while leaving the sides — which reads as broken rather than
-     full-bleed. The scene is laid out inside this panel to match. */
+  /* Full width, pinned to the bottom edge. The painting is 4:3, so at full
+     width it stands taller than the viewport and its sky is cropped off the
+     top — which is the point: the mountains, blossoms and lower border run
+     along the bottom of the frame at full size. */
   background-color: var(--creme);
   background-image: url("./assets/backdrop.webp");
-  background-size: contain;
-  background-position: center;
+  background-size: 100% auto;
+  background-position: center bottom;
   background-repeat: no-repeat;
 }
 
