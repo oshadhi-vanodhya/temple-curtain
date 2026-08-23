@@ -104,11 +104,22 @@ letterboxed.
 
 The artwork supplies its own pavilion, so there is no roof plane in the scene any
 more — one would simply be a second roof stacked on the painted one. Instead the
-curtain is hung in the painted gate's *opening*, measured off the image: the
-lacquered pillar shafts run from y 0.456 to 0.856 and their inner edges stand at
-x 0.384 and 0.617. Those fractions are converted into world space using the same
-`cover` fit the CSS applies, so the curtain stays pinned inside the gateway at any
-viewport rather than drifting off it when the window changes shape.
+curtain is hung in the painted gate's *opening*, and it fills that opening
+completely. Every bound was measured off the image rather than eyeballed:
+
+| | fraction of artwork |
+|---|---|
+| underside of the bracket work | 0.369 |
+| foot of the plinths | 0.940 |
+| inner faces of the pillar shafts | 0.383 / 0.617 |
+
+The top matters particularly: nothing occludes the cloth any more, so a strand
+hung above 0.369 would draw *on top of* the painted beam rather than emerging
+from beneath it.
+
+These fractions are converted into world space using the same `cover` fit the CSS
+applies, so the curtain stays pinned inside the gateway at any viewport rather
+than drifting off it when the window changes shape.
 
 **`src/lib/glyph-atlas.js` + `src/lib/scene.js` — the curtain.**
 Every distinct character is packed into a single canvas atlas, so the whole

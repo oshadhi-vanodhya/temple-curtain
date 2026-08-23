@@ -9,15 +9,25 @@ const WORLD_HEIGHT = 10;
 const BACKDROP_ASPECT = 1700 / 925;
 
 /**
- * Where the painted gateway's opening sits inside the backdrop, as fractions of
- * the artwork. Measured off the image: the lacquered pillar shafts run from
- * y 0.456 to 0.856, and their inner edges stand at x 0.384 and 0.617.
+ * The painted gateway's opening, as fractions of the artwork. Every value
+ * measured off the image rather than eyeballed:
  *
- * The curtain is hung in that opening rather than from a roof of its own — this
- * backdrop supplies its own pavilion, and the separate roof plane that used to
- * sit above the strands would simply be a second roof stacked on the painted one.
+ *   - 0.369  underside of the bracket work spanning the pillars; below this row
+ *            the middle of the arch is open sky. The curtain starts here and not
+ *            above it — nothing occludes the cloth, so a strand hung any higher
+ *            would draw on top of the painted beam.
+ *   - 0.940  the foot of the plinths, where they meet the paving.
+ *   - 0.383 / 0.617  the inner faces of the lacquered shafts, which stay
+ *            constant all the way down.
+ *
+ * Between them these are the full height and width of the opening, so the
+ * curtain fills the gateway instead of floating inside it.
+ *
+ * It hangs here rather than from a roof of its own: this backdrop supplies its
+ * own pavilion, and a separate roof plane would just be a second roof stacked on
+ * the painted one.
  */
-const GATE = { left: 0.388, right: 0.612, top: 0.445, bottom: 0.875 };
+const GATE = { left: 0.386, right: 0.6135, top: 0.369, bottom: 0.94 };
 
 const CURTAIN_TEXT = "THE STRINGS REMEMBER EVERY HAND THAT HAS PASSED THROUGH THEM ";
 
