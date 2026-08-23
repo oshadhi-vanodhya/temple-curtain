@@ -1,14 +1,23 @@
 import * as THREE from "three";
 import { Cloth } from "./cloth.js";
 import { buildGlyphAtlas } from "./glyph-atlas.js";
-import roofUrl from "../assets/roof.webp";
 
 const COLS = 38;
 const ROWS = 48;
 
 const WORLD_HEIGHT = 10;
-const ROOF_ASPECT = 1400 / 732;
-const BACKDROP_ASPECT = 1448 / 1086;
+const BACKDROP_ASPECT = 1700 / 925;
+
+/**
+ * Where the painted gateway's opening sits inside the backdrop, as fractions of
+ * the artwork. Measured off the image: the lacquered pillar shafts run from
+ * y 0.456 to 0.856, and their inner edges stand at x 0.384 and 0.617.
+ *
+ * The curtain is hung in that opening rather than from a roof of its own — this
+ * backdrop supplies its own pavilion, and the separate roof plane that used to
+ * sit above the strands would simply be a second roof stacked on the painted one.
+ */
+const GATE = { left: 0.388, right: 0.612, top: 0.445, bottom: 0.875 };
 
 const CURTAIN_TEXT = "THE STRINGS REMEMBER EVERY HAND THAT HAS PASSED THROUGH THEM ";
 
@@ -112,7 +121,6 @@ export class TempleStrings {
     this.accumulator = 0;
 
     this.#buildCurtain();
-    this.#buildRoof();
     this.#buildDust();
 
     this.onResize = this.onResize.bind(this);
@@ -206,21 +214,6 @@ export class TempleStrings {
     this.scene.add(this.curtain);
   }
 
-  #buildRoof() {
-    const texture = new THREE.TextureLoader().load(roofUrl, () => {
-      if (!this.disposed) this.onResize();
-    });
-    texture.colorSpace = THREE.SRGBColorSpace;
-
-    this.roof = new THREE.Mesh(
-      new THREE.PlaneGeometry(1, 1),
-      new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: false })
-    );
-    // Painted over the cloth, so the strands hang from behind the beam.
-    this.roof.renderOrder = 5;
-    this.scene.add(this.roof);
-  }
-
   #buildDust() {
     const count = 200;
     const positions = new Float32Array(count * 3);
@@ -267,20 +260,23 @@ export class TempleStrings {
     this.camera.bottom = -WORLD_HEIGHT / 2;
     this.camera.updateProjectionMatrix();
 
-    this.panelWidth = this.worldWidth;
-    this.panelHeight = this.worldWidth / BACKDROP_ASPECT;
+    // Mirror CSS `background-size: cover` exactly, so the world knows where the
+    // artwork actually landed and the curtain can be pinned to the painted gate.
+    const viewAspect = this.worldWidth / WORLD_HEIGHT;
+    if (viewAspect > BACKDROP_ASPECT) {
+      this.panelWidth = this.worldWidth;
+      this.panelHeight = this.worldWidth / BACKDROP_ASPECT;
+    } else {
+      this.panelHeight = WORLD_HEIGHT;
+      this.panelWidth = WORLD_HEIGHT * BACKDROP_ASPECT;
+    }
 
-    const roofWidth = Math.min(this.worldWidth * 0.92, WORLD_HEIGHT * 0.38 * ROOF_ASPECT);
-    const roofHeight = roofWidth / ROOF_ASPECT;
-    const roofTop = WORLD_HEIGHT / 2 - 0.2;
-    const roofBottom = roofTop - roofHeight;
-
-    this.roof.scale.set(roofWidth, roofHeight, 1);
-    this.roof.position.set(0, roofBottom + roofHeight / 2, 1);
-
-    const span = roofWidth * 0.78;
-    const top = roofBottom + roofHeight * 0.13;
-    const bottom = -WORLD_HEIGHT / 2 + 0.35;
+    // The gate's opening, converted from artwork fractions into world space.
+    const left = (GATE.left - 0.5) * this.panelWidth;
+    const right = (GATE.right - 0.5) * this.panelWidth;
+    const top = (0.5 - GATE.top) * this.panelHeight;
+    const bottom = (0.5 - GATE.bottom) * this.panelHeight;
+    const span = right - left;
 
     this.cellW = span / (COLS - 1);
     this.cellH = (top - bottom) / (ROWS - 1) / DRAPE_SLACK;
@@ -288,7 +284,7 @@ export class TempleStrings {
     this.clothTop = top;
 
     this.cloth.drape({
-      left: -span / 2,
+      left,
       top,
       cellW: this.cellW,
       cellH: this.cellH,
@@ -589,10 +585,6 @@ export class TempleStrings {
     this.curtain.geometry.dispose();
     this.curtain.material.dispose();
     this.atlasTexture.dispose();
-
-    this.roof.geometry.dispose();
-    this.roof.material.map?.dispose();
-    this.roof.material.dispose();
 
     this.dust.geometry.dispose();
     this.dust.material.dispose();

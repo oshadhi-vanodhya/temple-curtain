@@ -1,13 +1,13 @@
 # Temple — a curtain of letters
 
 An interactive instrument in React and three.js. Thirty-eight strands of letters —
-about forty letters each — hang from a temple roof like a beaded curtain, in a
-still, creme-lit room. Move the pointer near them and they heave aside; move it
+about forty letters each — hang in the opening of a painted temple gateway like a
+beaded curtain. Move the pointer near them and they heave aside; move it
 *through* them and each strand you cross rings with a struck-metal chime and
 carries a visible wave down its length, the letters tilting as it passes.
 
-The sound is generated at runtime — no audio files. The only binary assets are the
-roof and the painted backdrop.
+The sound is generated at runtime — no audio files. The only binary asset is the
+painted backdrop.
 
 ## Run it
 
@@ -97,18 +97,18 @@ as spurious tones. Bounding the span keeps the rise monotonic across the curtain
 lets neighbours share a note as a real chime set does, and keeps every strand
 audible: 294 Hz to 1976 Hz, highest partial 12 kHz.
 
-**The backdrop.**
-The painting runs the full width of the viewport and is pinned to the bottom
-edge. It is 4:3, so at full width it stands taller than the window and its sky is
-cropped off the top — which is the intent: the mountains, blossoms and ruled
-lower border sit along the bottom of the frame at full size.
+**The backdrop, and where the curtain hangs.**
+The painting is covered and centred. It is near-widescreen already, so `cover`
+costs almost nothing on a typical window while guaranteeing the gateway is never
+letterboxed.
 
-Because nothing is letterboxed, the scene is composed against the viewport
-itself; only the curtain's lower margin answers to the painting, stopping just
-above the ruled border. Layout is driven by a `ResizeObserver` plus a per-frame
-box check rather than the window `resize` event — that event was observed not to
-reach the handler after a viewport change, leaving the world scale stale and the
-scene visibly mis-sized.
+The artwork supplies its own pavilion, so there is no roof plane in the scene any
+more — one would simply be a second roof stacked on the painted one. Instead the
+curtain is hung in the painted gate's *opening*, measured off the image: the
+lacquered pillar shafts run from y 0.456 to 0.856 and their inner edges stand at
+x 0.384 and 0.617. Those fractions are converted into world space using the same
+`cover` fit the CSS applies, so the curtain stays pinned inside the gateway at any
+viewport rather than drifting off it when the window changes shape.
 
 **`src/lib/glyph-atlas.js` + `src/lib/scene.js` — the curtain.**
 Every distinct character is packed into a single canvas atlas, so the whole
@@ -137,11 +137,6 @@ Two pointer responses:
   With the cloth free to move in two dimensions a strand is no longer a straight
   column, so the comparison is made against whichever of its particles is
   currently level with the pointer.
-
-The roof is drawn last with `depthTest` off, so the strands appear to hang from
-behind the beam. Its size is capped by height on wide screens and by width on
-narrow ones, so the pavilion keeps its proportions instead of swallowing the
-viewport.
 
 The roof's height and the curtain's drop share one fixed vertical budget, and the
 roof artwork's aspect is fixed — so every bit of extra drop for the strands comes

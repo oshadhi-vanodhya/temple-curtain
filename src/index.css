@@ -38,14 +38,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Full width, pinned to the bottom edge. The painting is 4:3, so at full
-     width it stands taller than the viewport and its sky is cropped off the
-     top — which is the point: the mountains, blossoms and lower border run
-     along the bottom of the frame at full size. */
+  /* Covered and centred. This painting is near-widescreen already, so `cover`
+     costs almost nothing on a typical window while guaranteeing the gateway is
+     never letterboxed. The curtain is positioned against the same fit, so it
+     stays hung in the painted gate's opening at any viewport. */
   background-color: var(--creme);
   background-image: url("./assets/backdrop.webp");
-  background-size: 100% auto;
-  background-position: center bottom;
+  background-size: cover;
+  background-position: center;
   background-repeat: no-repeat;
 }
 
