@@ -71,23 +71,31 @@ the cursor so a fold can be dragged out of the curtain by hand, and releasing it
 hands the particle back to gravity.
 
 **`src/lib/chime.js` — the sound.**
-A struck bowl is *inharmonic*: its partials are not integer multiples of the
-fundamental, which is precisely why a bell reads as a bell and not an organ. Six
-partials at bell-family ratios (1, 2.01, 2.76, 4.07, 5.43, 7.12), with the lower
-ones ringing longest. The fundamental and second partial are each split into a
-detuned pair that beat slowly against one another — that shimmer is what keeps a
-struck bowl sounding alive rather than synthetic. A whisper of filtered noise at
-onset supplies the strike transient.
+Modelled on the **bianzhong** (编钟), the bronze chime-bells of ancient China,
+rather than on a Western bell or a Himalayan bowl. Fully synthesised — no samples.
 
-Reverb is a `ConvolverNode` fed a procedurally generated impulse: decaying stereo
-noise plus a few sparse early reflections, so it reads as a stone hall instead of
-flat noise.
+The defining feature is the almond-shaped cross-section. Unlike a round bell it
+sounds *two* pitches — the **sui**, struck at the centre, and the **gu**, struck
+at the side, about a minor third apart — and a single strike excites both. That
+interval inside one note is the signature; a round bell cannot produce it.
+Measured off the output bus, a strike at 294 Hz shows peaks at **293 Hz and
+351.6 Hz — a ratio of 1.197**, with the gu only 3.5 dB below the sui.
 
-The strands are tuned to a minor pentatonic from D4 (294 Hz) up to 3520 Hz. Any
-two notes in that set are consonant, so dragging across the whole array at speed
-still resolves as music rather than a pile-up. Gain tilts down toward the top of
-the range, because our hearing peaks around 3–4 kHz and equal-amplitude sines get
-harsh as they climb.
+The same lens shape damps the fundamental fast, so a bianzhong has none of the
+long cathedral hum of a Western bell: it speaks and stops. Measured, the strike
+falls 40 dB in **1.0 s** and is silent by 1.5 s. The room is short and dry to
+match — a long tail would drown bells this brief.
+
+Strands are tuned to the Chinese five-tone scale, **gong shang jue zhi yu**,
+which is what a bianzhong set is actually tuned to.
+
+That scale is folded into a fixed span of three octaves rather than climbing one
+strand at a time. A pentatonic rises an octave every five strands, so across
+thirty-eight of them it reached nearly eight octaves: the upper strands ran to
+**47 kHz** — inaudible, and past the Nyquist limit, where they aliased back down
+as spurious tones. Bounding the span keeps the rise monotonic across the curtain,
+lets neighbours share a note as a real chime set does, and keeps every strand
+audible: 294 Hz to 1976 Hz, highest partial 12 kHz.
 
 **The backdrop.**
 The painting runs the full width of the viewport and is pinned to the bottom

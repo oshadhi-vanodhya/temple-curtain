@@ -8,18 +8,29 @@
  * bell-family spread, with the lower partials ringing longest.
  */
 
+/**
+ * Modelled on the bianzhong — the bronze chime-bells of ancient China — rather
+ * than on a Western bell or a Himalayan bowl.
+ *
+ * The defining feature is the almond-shaped cross-section: unlike a round bell
+ * it sounds *two* pitches, the sui (struck at the centre) and the gu (struck at
+ * the side), about a minor third apart, and a single strike excites both. That
+ * interval inside one note is the sound's signature — a round bell cannot make
+ * it. The same lens shape damps the fundamental quickly, so a bianzhong has
+ * none of the long cathedral hum of a Western bell; it speaks and stops.
+ */
+const MINOR_THIRD = Math.pow(2, 3 / 12); // 1.1892 — the sui/gu interval
+
 const PARTIALS = [
-  { ratio: 1.0, gain: 1.0, decay: 1.0, detune: 0.7 },
-  { ratio: 2.01, gain: 0.5, decay: 0.72, detune: -0.6 },
-  { ratio: 2.76, gain: 0.4, decay: 0.55 },
-  { ratio: 4.07, gain: 0.2, decay: 0.4 },
-  { ratio: 5.43, gain: 0.14, decay: 0.3 },
-  { ratio: 7.12, gain: 0.08, decay: 0.22 },
+  { ratio: 1.0, gain: 1.0, decay: 1.0, detune: 0.5 },            // sui
+  { ratio: MINOR_THIRD, gain: 0.72, decay: 0.86, detune: -0.6 }, // gu
+  { ratio: 2.0, gain: 0.34, decay: 0.5 },
+  { ratio: 2 * MINOR_THIRD, gain: 0.26, decay: 0.42 },
+  { ratio: 3.42, gain: 0.14, decay: 0.28 },
+  { ratio: 4.63, gain: 0.08, decay: 0.2 },
+  { ratio: 6.1, gain: 0.04, decay: 0.14 },
 ];
 
-// A single sweep across all 38 strands is 38 simultaneous voices, and sweeps
-// overlap — so the ceiling has to clear that comfortably, or the user hears
-// their own gesture come up silent.
 const MAX_VOICES = 56;
 
 /** Decaying stereo noise — a convolution impulse that reads as a stone hall. */
@@ -77,13 +88,13 @@ export class ChimeEngine {
     // Takes the glassy edge off the top partials.
     const tone = ctx.createBiquadFilter();
     tone.type = "lowpass";
-    tone.frequency.value = 7200;
+    tone.frequency.value = 9000;
     tone.Q.value = 0.4;
 
     const reverb = ctx.createConvolver();
-    reverb.buffer = buildImpulse(ctx);
+    reverb.buffer = buildImpulse(ctx, 2.0, 3.0);
     const wet = ctx.createGain();
-    wet.gain.value = 0.38;
+    wet.gain.value = 0.26;
 
     master.connect(tone);
     tone.connect(limiter);
@@ -96,8 +107,20 @@ export class ChimeEngine {
     this.master = master;
 
     await ctx.resume();
-    this.ready = ctx.state === "running";
-    return this.ready;
+
+    if (ctx.state !== "running") {
+      // Hand the context back rather than leaving it suspended and orphaned.
+      // Browsers cap how many an page may hold at once, so a few refused
+      // starts would otherwise use up the budget and make later, legitimate
+      // attempts throw instead of simply returning false.
+      await ctx.close();
+      this.ctx = null;
+      this.master = null;
+      return false;
+    }
+
+    this.ready = true;
+    return true;
   }
 
   /**
@@ -114,7 +137,7 @@ export class ChimeEngine {
     const v = Math.min(1, Math.max(0.05, velocity));
 
     // Higher strings ring a little shorter, as thinner metal does.
-    const base = 3.4 * (1 - Math.min(0.45, (freq - 290) / 3200));
+    const base = 1.9 * (1 - Math.min(0.45, (freq - 290) / 3200));
 
     // Equal-amplitude sines get harsher as they climb, because our hearing
     // peaks around 3-4 kHz. Tilting the top of the range down keeps the
@@ -143,7 +166,12 @@ export class ChimeEngine {
       for (const cents of voices) {
         const osc = ctx.createOscillator();
         osc.type = "sine";
-        osc.frequency.value = freq * p.ratio;
+        // Struck metal starts fractionally sharp and settles — a small glide,
+        // but its absence is what makes a synthetic bell sound switched-on
+        // rather than hit.
+        const f = freq * p.ratio;
+        osc.frequency.setValueAtTime(f * 1.006, now);
+        osc.frequency.exponentialRampToValueAtTime(f, now + 0.07);
         osc.detune.value = cents;
 
         const g = ctx.createGain();
@@ -160,7 +188,7 @@ export class ChimeEngine {
     }
 
     // The strike transient: a whisper of filtered noise at the moment of contact.
-    const noiseLen = Math.floor(ctx.sampleRate * 0.06);
+    const noiseLen = Math.floor(ctx.sampleRate * 0.035);
     const buf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < noiseLen; i++) {
@@ -171,11 +199,11 @@ export class ChimeEngine {
 
     const bp = ctx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.value = Math.min(11000, freq * 5);
-    bp.Q.value = 1.1;
+    bp.frequency.value = Math.min(12000, freq * 7);
+    bp.Q.value = 0.9;
 
     const ng = ctx.createGain();
-    ng.gain.value = 0.1 * v;
+    ng.gain.value = 0.16 * v;
 
     noise.connect(bp);
     bp.connect(ng);

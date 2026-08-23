@@ -57,11 +57,27 @@ function smoothstep(edge0, edge1, x) {
   return t * t * (3 - 2 * t);
 }
 
-function pentatonic(count, root = 293.66) {
-  const steps = [0, 3, 5, 7, 10];
+/**
+ * The Chinese five-tone scale — gong, shang, jue, zhi, yu — which is what a
+ * bianzhong set is actually tuned to. Any two of its notes sound consonant, so a
+ * fast sweep across the whole curtain resolves as music rather than a pile-up.
+ *
+ * The scale is deliberately folded into a fixed span of octaves instead of
+ * climbing one strand at a time. A pentatonic rises an octave every five
+ * strands, so across thirty-eight of them it reaches nearly eight octaves: the
+ * upper strands ran to 47 kHz — silent, and past the Nyquist limit where they
+ * alias back down as spurious tones. Mapping strands onto a bounded set of
+ * pitches keeps the rise monotonic across the curtain, lets neighbours share a
+ * note as a real chime set does, and keeps every strand audible.
+ */
+function pentatonicOverOctaves(count, root = 293.66, octaves = 3) {
+  const steps = [0, 2, 4, 7, 9];
+  const distinct = steps.length * octaves;
   const out = [];
+
   for (let i = 0; i < count; i++) {
-    const semitone = steps[i % steps.length] + 12 * Math.floor(i / steps.length);
+    const n = Math.floor((i * distinct) / count);
+    const semitone = steps[n % steps.length] + 12 * Math.floor(n / steps.length);
     out.push(root * Math.pow(2, semitone / 12));
   }
   return out;
@@ -87,7 +103,7 @@ export class TempleStrings {
     this.grabbed = -1;
 
     this.cloth = new Cloth(COLS, ROWS);
-    this.freqs = pentatonic(COLS);
+    this.freqs = pentatonicOverOctaves(COLS);
     // Which side of each strand the pointer was last on, for strike detection.
     this.sides = new Int8Array(COLS);
     this.lastStrike = new Float64Array(COLS);
