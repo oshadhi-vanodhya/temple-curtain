@@ -1,43 +1,61 @@
 import * as THREE from "three";
-import { VibratingString } from "./string-sim.js";
+import { Cloth } from "./cloth.js";
 import { buildGlyphAtlas } from "./glyph-atlas.js";
 import roofUrl from "../assets/roof.webp";
 
-const STRING_COUNT = 38;
-const NODES = 50;
+const COLS = 38;
+const ROWS = 48;
 
 const WORLD_HEIGHT = 10;
-const ROOF_ASPECT = 1400 / 732; // the trimmed artwork's true ratio
-// The backdrop painting is shown whole (CSS `background-size: contain`), so on
-// most viewports it occupies a centred 4:3 panel narrower than the window. The
-// scene is composed inside that panel rather than the viewport, so the pavilion
-// stays within the painted frame instead of drifting over the letterboxing.
+const ROOF_ASPECT = 1400 / 732;
 const BACKDROP_ASPECT = 1448 / 1086;
 
-/** The text the curtain is woven from; it repeats across strands. */
 const CURTAIN_TEXT = "THE STRINGS REMEMBER EVERY HAND THAT HAS PASSED THROUGH THEM ";
 
 const REST_COLOR = new THREE.Color("#4a4235");
 const RING_COLOR = new THREE.Color("#c8922f");
 
-// Pointer travel (in world units per move) needed for a full-strength gust.
-const WIND_GAIN = 3.2;
-// Compresses the response so gentle movement still stirs the curtain. A linear
-// mapping made slow drifts nearly inert while fast ones were already clamped at
-// full strength — raising the gain alone would only have widened that gap. An
-// exponent below 1 lifts the quiet end and leaves the loud end where it is:
-// a drift a tenth of full speed now reads at about a third of full strength
-// instead of a tenth.
-const WIND_CURVE = 0.45;
-// How quickly the gust follows the pointer, and how fast it dies once it stops.
-const WIND_SMOOTH = 0.35;
-const WIND_DECAY = 0.986;
-// Fraction of the remaining distance to the wind's target shape a node closes
-// each frame at 60fps.
-const WIND_APPROACH = 0.32;
+// --- cloth tuning, all expressed against cell size so it survives a resize ---
+const GRAVITY_PER_CELL = 0.02;
+const DAMPING = 0.99;
+const ITERATIONS = 5;
+// Strands carry weight, so they may barely stretch but may fold up freely.
+const V_COMPRESS = 0.02;
+const V_STRETCH = 1.1;
+// Neighbours are only loosely tied, which is what lets the sheet gather.
+const H_COMPRESS = 0.6;
+const H_STRETCH = 4;
+// Every vertical link ends up carrying the weight of all the cloth beneath it,
+// so after five relaxation passes the sheet settles noticeably longer than its
+// cut length — measured at 1.21x, past what the 1.1 stretch limit implies,
+// because a slack constraint sharing a pinned partner only closes half its
+// error per pass. The sheet is therefore cut short by that same factor so it
+// arrives at the intended length once hung. Scale-invariant: gravity is derived
+// from cell height, so the ratio holds at any viewport size.
+const DRAPE_SLACK = 1.21;
+
+const POINTER_REACH_CELLS = 7;
+// Peak shove, as a multiple of gravity. Expressed this way rather than as the
+// reference's bare constant because that constant does not survive the change
+// of scale — carried across faithfully it moved this sheet by a fifth of a
+// pixel. A hanging cloth is taut under its own weight, so a shove has to be
+// large against gravity before it reads at all; measured, the response is
+// linear. Measured across a sweep: 20x moves the sheet 12px, 45x moves it 40px
+// (about three strand widths) and leaves nothing crossed over, 65x reaches 77px
+// but leaves strands folded past one another with the text scrambled.
+const POINTER_PUSH_GRAVITIES = 45;
+const GRAB_RADIUS_CELLS = 2;
+
+const STEP_MS = 1000 / 60;
+const MAX_STEPS_PER_FRAME = 3;
 
 const STRIKE_COOLDOWN_MS = 70;
 const IDLE_BEFORE_BREEZE_MS = 6500;
+
+function smoothstep(edge0, edge1, x) {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
 
 function pentatonic(count, root = 293.66) {
   const steps = [0, 3, 5, 7, 10];
@@ -64,37 +82,37 @@ export class TempleStrings {
     this.camera.position.set(0, 0, 10);
 
     this.pointer = new THREE.Vector2(0, 0);
-    this.prevPointer = new THREE.Vector2(0, 0);
     this.pointerActive = false;
-    this.pointerSpeed = 0;
     this.lastMoveAt = 0;
-    // Signed gust strength, -1 (blowing left) to 1 (blowing right).
-    this.wind = 0;
+    this.grabbed = -1;
 
-    this.strings = [];
-    this.stringTop = 0;
-    this.stringBottom = -4;
-    this.glyphSize = 0.17;
+    this.cloth = new Cloth(COLS, ROWS);
+    this.freqs = pentatonic(COLS);
+    // Which side of each strand the pointer was last on, for strike detection.
+    this.sides = new Int8Array(COLS);
+    this.lastStrike = new Float64Array(COLS);
+    this.glow = new Float32Array(COLS);
 
-    this.#buildStrings();
+    this.accumulator = 0;
+
     this.#buildCurtain();
     this.#buildRoof();
     this.#buildDust();
 
     this.onResize = this.onResize.bind(this);
     this.onPointerMove = this.onPointerMove.bind(this);
+    this.onPointerDown = this.onPointerDown.bind(this);
+    this.onPointerUp = this.onPointerUp.bind(this);
     this.onPointerLeave = this.onPointerLeave.bind(this);
     this.tick = this.tick.bind(this);
 
-    // A ResizeObserver rather than window's resize event: the scene has to stay
-    // pinned to the CSS-painted backdrop panel, and the container's box can
-    // change without a window resize firing — which leaves the world scale stale
-    // and the pavilion misaligned against the painting behind it.
     this.resizeObserver = new ResizeObserver(() => this.onResize());
     this.resizeObserver.observe(container);
 
     container.addEventListener("pointermove", this.onPointerMove);
+    container.addEventListener("pointerdown", this.onPointerDown);
     container.addEventListener("pointerleave", this.onPointerLeave);
+    window.addEventListener("pointerup", this.onPointerUp);
 
     this.onResize();
     this.startedAt = performance.now();
@@ -105,38 +123,6 @@ export class TempleStrings {
     this.chime = chime;
   }
 
-  #buildStrings() {
-    const freqs = pentatonic(STRING_COUNT);
-
-    for (let i = 0; i < STRING_COUNT; i++) {
-      const t = STRING_COUNT === 1 ? 0.5 : i / (STRING_COUNT - 1);
-
-      const sim = new VibratingString({
-        x: 0, // real x comes from layout(), which depends on viewport width
-        z: 0,
-        top: 0,
-        bottom: -4,
-        nodes: NODES,
-        // Cloth, not wire. Light damping let each strand ring on at its own
-        // natural frequency, so after a gust they drifted out of phase and the
-        // curtain churned instead of settling together. Heavy damping keeps the
-        // whole curtain answering the wind as one sheet, and the near-uniform
-        // wave speed stops neighbours separating into different rhythms.
-        speed: 0.33 + t * 0.04,
-        damping: 0.992 - t * 0.0015,
-        freq: freqs[i],
-        freeEnd: true,
-      });
-      sim.slot = t;
-      this.strings.push(sim);
-    }
-  }
-
-  /**
-   * One mesh for every letter in the curtain. Each glyph is a quad whose four
-   * corners are rewritten each frame from its strand's shape, so the letters
-   * ride the wave and tilt with the strand's local angle.
-   */
   #buildCurtain() {
     const { canvas, index } = buildGlyphAtlas(CURTAIN_TEXT);
 
@@ -147,15 +133,13 @@ export class TempleStrings {
     texture.magFilter = THREE.LinearFilter;
     this.atlasTexture = texture;
 
-    // Spaces in the source text become gaps in the curtain rather than blank
-    // quads, so nothing is drawn for them at all.
+    // Spaces become real gaps in the weave rather than blank quads.
     const cells = [];
-    for (let i = 0; i < STRING_COUNT; i++) {
-      for (let n = 0; n < NODES; n++) {
-        // Offset each strand so neighbours don't start on the same letter.
-        const ch = CURTAIN_TEXT[(n + i * 7) % CURTAIN_TEXT.length];
+    for (let col = 0; col < COLS; col++) {
+      for (let row = 0; row < ROWS; row++) {
+        const ch = CURTAIN_TEXT[(row + col * 7) % CURTAIN_TEXT.length];
         const uv = index.get(ch);
-        if (uv) cells.push({ string: i, node: n, uv });
+        if (uv) cells.push({ col, row, uv });
       }
     }
     this.cells = cells;
@@ -176,8 +160,8 @@ export class TempleStrings {
 
       const v = q * 4;
       const k = q * 6;
-      indices[k] = v;         indices[k + 1] = v + 1; indices[k + 2] = v + 2;
-      indices[k + 3] = v;     indices[k + 4] = v + 2; indices[k + 5] = v + 3;
+      indices[k] = v;     indices[k + 1] = v + 1; indices[k + 2] = v + 2;
+      indices[k + 3] = v; indices[k + 4] = v + 2; indices[k + 5] = v + 3;
     });
 
     const geometry = new THREE.BufferGeometry();
@@ -191,15 +175,16 @@ export class TempleStrings {
     geometry.setAttribute("color", this.colAttr);
     geometry.setIndex(new THREE.BufferAttribute(indices, 1));
 
-    const material = new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-      vertexColors: true,
-      depthTest: false,
-      depthWrite: false,
-    });
-
-    this.curtain = new THREE.Mesh(geometry, material);
+    this.curtain = new THREE.Mesh(
+      geometry,
+      new THREE.MeshBasicMaterial({
+        map: texture,
+        transparent: true,
+        vertexColors: true,
+        depthTest: false,
+        depthWrite: false,
+      })
+    );
     this.curtain.frustumCulled = false;
     this.curtain.renderOrder = 2;
     this.scene.add(this.curtain);
@@ -207,8 +192,6 @@ export class TempleStrings {
 
   #buildRoof() {
     const texture = new THREE.TextureLoader().load(roofUrl, () => {
-      // The artwork decides nothing about layout, but a repaint once it lands
-      // avoids a frame of missing roof.
       if (!this.disposed) this.onResize();
     });
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -217,7 +200,7 @@ export class TempleStrings {
       new THREE.PlaneGeometry(1, 1),
       new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthTest: false })
     );
-    // Painted last so the strands appear to hang from behind the beam.
+    // Painted over the cloth, so the strands hang from behind the beam.
     this.roof.renderOrder = 5;
     this.scene.add(this.roof);
   }
@@ -226,11 +209,11 @@ export class TempleStrings {
     const count = 200;
     const positions = new Float32Array(count * 3);
     this.dustSeeds = new Float32Array(count);
-
     this.dustNorm = new Float32Array(count);
+
     for (let i = 0; i < count; i++) {
       this.dustNorm[i] = Math.random() - 0.5;
-      positions[i * 3] = 0; // real x is assigned in layout(), from the panel width
+      positions[i * 3] = 0;
       positions[i * 3 + 1] = (Math.random() - 0.5) * WORLD_HEIGHT;
       positions[i * 3 + 2] = -1;
       this.dustSeeds[i] = Math.random() * Math.PI * 2;
@@ -260,8 +243,7 @@ export class TempleStrings {
     this.laidOutAt = w * 100000 + h;
     this.renderer.setSize(w, h);
 
-    const aspect = w / h;
-    this.worldWidth = WORLD_HEIGHT * aspect;
+    this.worldWidth = WORLD_HEIGHT * (w / h);
 
     this.camera.left = -this.worldWidth / 2;
     this.camera.right = this.worldWidth / 2;
@@ -269,18 +251,9 @@ export class TempleStrings {
     this.camera.bottom = -WORLD_HEIGHT / 2;
     this.camera.updateProjectionMatrix();
 
-    // The backdrop runs the full width and is pinned to the bottom edge, so it
-    // stands taller than the viewport and its top is cropped. Nothing is
-    // letterboxed any more, so the scene is composed against the viewport
-    // itself; only the lower margin still answers to the painting, whose ruled
-    // border sits just inside the bottom edge.
     this.panelWidth = this.worldWidth;
     this.panelHeight = this.worldWidth / BACKDROP_ASPECT;
 
-    // The roof and the curtain share one fixed vertical budget, and the roof's
-    // aspect is fixed — so every bit of extra drop for the strands has to come
-    // out of the roof's height. 0.38 is the point where the curtain reads as
-    // taller than it is wide without the pavilion becoming a trinket.
     const roofWidth = Math.min(this.worldWidth * 0.92, WORLD_HEIGHT * 0.38 * ROOF_ASPECT);
     const roofHeight = roofWidth / ROOF_ASPECT;
     const roofTop = WORLD_HEIGHT / 2 - 0.2;
@@ -289,28 +262,32 @@ export class TempleStrings {
     this.roof.scale.set(roofWidth, roofHeight, 1);
     this.roof.position.set(0, roofBottom + roofHeight / 2, 1);
 
-    // Strands hang from the beam, inside the upturned eaves.
     const span = roofWidth * 0.78;
-    // Start a little above the roof's lower edge so the tops are hidden behind it.
-    this.stringTop = roofBottom + roofHeight * 0.13;
-    // The curtain hangs over the open water at the painting's centre, clear of
-    // the blossoms in the corners, stopping just above the ruled lower border.
-    this.stringBottom = -WORLD_HEIGHT / 2 + 0.35;
+    const top = roofBottom + roofHeight * 0.13;
+    const bottom = -WORLD_HEIGHT / 2 + 0.35;
 
-    const gap = span / (STRING_COUNT - 1);
-    this.glyphSize = gap * 0.98;
+    this.cellW = span / (COLS - 1);
+    this.cellH = (top - bottom) / (ROWS - 1) / DRAPE_SLACK;
+    this.glyphSize = this.cellW * 0.98;
+    this.clothTop = top;
 
-    for (const s of this.strings) {
-      s.x = -span / 2 + s.slot * span;
-      s.top = this.stringTop;
-      s.bottom = this.stringBottom;
-      // This is both the clamp and the scale the wind leans against, so raising
-      // it buys no headroom — it just makes every gust proportionally wider. It
-      // is set by how far the strongest gust should throw the hem.
-      s.maxAmplitude = gap * 5.5;
-    }
+    this.cloth.drape({
+      left: -span / 2,
+      top,
+      cellW: this.cellW,
+      cellH: this.cellH,
+      vCompress: V_COMPRESS,
+      vStretch: V_STRETCH,
+      hCompress: H_COMPRESS,
+      hStretch: H_STRETCH,
+    });
 
-    this.pushRadius = gap * 9;
+    this.gravity = GRAVITY_PER_CELL * this.cellH;
+    // Held on the instance rather than read from the constant directly, so the
+    // shove can be tuned against a live cloth.
+    this.pointerStrength = POINTER_PUSH_GRAVITIES;
+    this.reachSq = Math.pow(POINTER_REACH_CELLS * this.cellW, 2);
+    this.grabRadius = GRAB_RADIUS_CELLS * this.cellW;
 
     const dustPos = this.dust.geometry.attributes.position;
     for (let i = 0; i < this.dustNorm.length; i++) {
@@ -319,119 +296,144 @@ export class TempleStrings {
     dustPos.needsUpdate = true;
   }
 
-  onPointerMove(e) {
+  #toWorld(e) {
     const rect = this.container.getBoundingClientRect();
     const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     const ndcY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
+    return [(ndcX * this.worldWidth) / 2, (ndcY * WORLD_HEIGHT) / 2];
+  }
 
-    const x = (ndcX * this.worldWidth) / 2;
-    const y = (ndcY * WORLD_HEIGHT) / 2;
+  onPointerDown(e) {
+    const [x, y] = this.#toWorld(e);
+    this.pointer.set(x, y);
+
+    // Grab the nearest particle so the cloth can be taken hold of and dragged.
+    const { posX, posY, count } = this.cloth;
+    let best = -1;
+    let bestDist = this.grabRadius;
+    for (let i = 0; i < count; i++) {
+      const d = Math.hypot(posX[i] - x, posY[i] - y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    }
+    if (best >= 0) {
+      this.grabbed = best;
+      this.grabbedWasPinned = this.cloth.pinned[best];
+      this.cloth.pinned[best] = 1;
+    }
+  }
+
+  onPointerUp() {
+    if (this.grabbed >= 0) {
+      this.cloth.pinned[this.grabbed] = this.grabbedWasPinned;
+      this.grabbed = -1;
+    }
+  }
+
+  onPointerMove(e) {
+    const [x, y] = this.#toWorld(e);
 
     if (!this.pointerActive) {
-      // Seed both points on entry, so we don't read a bogus crossing of every
-      // strand between wherever the pointer left and where it came back.
-      this.prevPointer.set(x, y);
+      // Entering fresh: forget which side of each strand we were on, so
+      // re-entry doesn't read as having crossed everything in between.
+      this.sides.fill(0);
       this.pointerActive = true;
-    } else {
-      this.prevPointer.copy(this.pointer);
     }
 
     this.pointer.set(x, y);
-    this.pointerSpeed = this.pointer.distanceTo(this.prevPointer);
     this.lastMoveAt = performance.now();
 
-    const travel = this.pointer.x - this.prevPointer.x;
-    const strength = Math.min(1, Math.abs(travel) * WIND_GAIN);
-    const gust = Math.sign(travel) * Math.pow(strength, WIND_CURVE);
-    this.wind += (gust - this.wind) * WIND_SMOOTH;
+    const cloth = this.cloth;
 
+    if (this.grabbed >= 0) {
+      // Move it *and* its previous position, or verlet reads the jump as speed.
+      cloth.posX[this.grabbed] = x;
+      cloth.posY[this.grabbed] = y;
+      cloth.oldX[this.grabbed] = x;
+      cloth.oldY[this.grabbed] = y;
+    }
+
+    this.#pushAside(x, y);
     this.#detectCrossings();
   }
 
   onPointerLeave() {
     this.pointerActive = false;
-    this.pointerSpeed = 0;
+    this.sides.fill(0);
   }
 
   /**
-   * The pointer is treated as a gust of wind rather than as a solid object.
+   * A radial shove away from the pointer, falling off with squared distance.
    *
-   * The previous model pushed strands away from the pointer on both sides, which
-   * parts the curtain around it — that reads as a hole punched through the
-   * fabric, not as cloth moving. Wind has a single direction: every strand leans
-   * the same way at any instant, and only the *amount* varies. Strands nearest
-   * where the gust lands lean furthest, the rest trail off with distance, and
-   * because neighbours differ only slightly they shear past one another instead
-   * of crossing.
-   *
-   * Direction comes from the pointer's horizontal travel, so dragging left blows
-   * the curtain left. The gust outlives the movement that made it and dies away
-   * over about a second, which is what lets the curtain swing back and settle on
-   * its own rather than snapping straight the moment the pointer stops.
-   *
-   * @param {number} dtScale frame time relative to 60fps.
+   * There is no separate notion of wind any more: the cloth's own structure
+   * carries the motion. Shoving a handful of particles aside drags their
+   * neighbours along through the horizontal links, so the disturbance spreads
+   * across the sheet and down each strand on its own.
    */
-  #applyWind(dtScale) {
-    this.wind *= Math.pow(WIND_DECAY, dtScale);
-    if (Math.abs(this.wind) < 0.0008) return;
+  #pushAside(mx, my) {
+    const { posX, posY, count } = this.cloth;
+    const reachSq = this.reachSq;
+    const strength = this.pointerStrength * this.gravity;
 
-    // Wide enough that the whole curtain answers a gust, peaked enough that the
-    // strand it lands on clearly leads.
-    const sigma = this.pushRadius * 0.75;
-    const step = Math.min(0.9, WIND_APPROACH * dtScale);
+    for (let i = 0; i < count; i++) {
+      const dx = mx - posX[i];
+      const dy = my - posY[i];
+      const distSq = dx * dx + dy * dy;
+      if (distSq >= reachSq) continue;
 
-    for (const s of this.strings) {
-      const d = s.x - this.pointer.x;
-      const near = Math.exp(-(d * d) / (2 * sigma * sigma));
-      // The floor keeps distant strands alive: a gust moves the whole curtain,
-      // just less the further it has to travel.
-      const prox = 0.16 + 0.84 * near;
+      const falloff = smoothstep(reachSq, -0.4 * reachSq, distSq);
+      const dist = Math.sqrt(distSq) || 1e-6;
+      const push = falloff * strength;
 
-      const lastMovable = s.freeEnd ? s.nodes - 1 : s.nodes - 2;
-      const lean = this.wind * s.maxAmplitude * prox;
-
-      for (let i = 1; i <= lastMovable; i++) {
-        // Held at the beam, free at the hem — the classic hanging-cloth curve.
-        const t = i / lastMovable;
-        const target = lean * Math.pow(t, 1.15);
-        s.u[i] += (target - s.u[i]) * step;
-      }
+      // Away from the pointer.
+      this.cloth.applyForce(i, (-dx / dist) * push, (-dy / dist) * push);
     }
   }
 
   /**
-   * A strand is struck when the pointer changes which side of it it is on
-   * between two frames. Comparing sides rather than distance means a fast flick
-   * still rings every strand it passed through, instead of skipping the ones
-   * that fell between two pointer samples.
+   * A strand rings when the pointer changes which side of it it is on. With the
+   * cloth free to move in two dimensions a strand is no longer a straight
+   * column, so the comparison is made against whichever of its particles is
+   * currently level with the pointer.
    */
   #detectCrossings() {
-    if (!this.pointerActive) return;
+    const { posX, posY } = this.cloth;
     const now = performance.now();
+    const yTolerance = this.cellH * 2.5;
 
-    for (const s of this.strings) {
-      const disp = s.displacementAtY(this.pointer.y);
-      if (disp === null) continue;
+    for (let col = 0; col < COLS; col++) {
+      let nearest = -1;
+      let nearestDy = Infinity;
+      for (let row = 0; row < ROWS; row++) {
+        const i = this.cloth.index(col, row);
+        const dy = Math.abs(posY[i] - this.pointer.y);
+        if (dy < nearestDy) {
+          nearestDy = dy;
+          nearest = i;
+        }
+      }
+      if (nearest < 0 || nearestDy > yTolerance) {
+        this.sides[col] = 0;
+        continue;
+      }
 
-      const surfaceX = s.x + disp;
-      // Deliberately a two-state side with no zero: Math.sign() reports 0 for a
-      // pointer sitting exactly on a strand, and skipping that sample plus the
-      // next would swallow the crossing entirely.
-      const side = this.pointer.x - surfaceX >= 0 ? 1 : -1;
-      const prevSide = this.prevPointer.x - surfaceX >= 0 ? 1 : -1;
+      // Two-state, never zero: a pointer exactly on a strand would otherwise
+      // drop both the arriving and the departing sample and swallow the cross.
+      const side = this.pointer.x - posX[nearest] >= 0 ? 1 : -1;
+      const prev = this.sides[col];
+      this.sides[col] = side;
 
-      if (side === prevSide) continue;
-      if (now - s.lastStrike < STRIKE_COOLDOWN_MS) continue;
+      if (prev === 0 || prev === side) continue;
+      if (now - this.lastStrike[col] < STRIKE_COOLDOWN_MS) continue;
 
-      s.lastStrike = now;
-
-      const velocity = Math.min(1, 0.28 + this.pointerSpeed * 1.5);
-      const index = s.indexAtY(this.pointer.y);
-      s.pluck(index, -side * 0.16 * velocity, Math.round(NODES * 0.18));
+      this.lastStrike[col] = now;
+      this.glow[col] = 1;
 
       if (this.chime) {
-        const pan = this.worldWidth ? (s.x / (this.worldWidth / 2)) * 0.7 : 0;
-        this.chime.strike(s.freq, velocity, pan);
+        const pan = this.worldWidth ? (posX[nearest] / (this.worldWidth / 2)) * 0.7 : 0;
+        this.chime.strike(this.freqs[col], 0.75, pan);
       }
     }
   }
@@ -440,41 +442,58 @@ export class TempleStrings {
     if (!this.chime || now - this.lastMoveAt < IDLE_BEFORE_BREEZE_MS) return;
     if (Math.random() > 0.004) return;
 
-    const s = this.strings[Math.floor(Math.random() * this.strings.length)];
-    if (now - s.lastStrike < 1200) return;
+    const col = Math.floor(Math.random() * COLS);
+    if (now - this.lastStrike[col] < 1200) return;
+    this.lastStrike[col] = now;
+    this.glow[col] = 0.5;
 
-    s.lastStrike = now;
-    s.pluck(Math.floor(NODES * (0.35 + Math.random() * 0.3)), 0.05, Math.round(NODES * 0.25));
-    const pan = this.worldWidth ? (s.x / (this.worldWidth / 2)) * 0.7 : 0;
-    this.chime.strike(s.freq, 0.16, pan);
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    for (let row = 1; row < ROWS; row++) {
+      const i = this.cloth.index(col, row);
+      this.cloth.applyForce(i, dir * this.cellW * 0.004 * (row / ROWS), 0);
+    }
+    const pan = (this.cloth.posX[this.cloth.index(col, 1)] / (this.worldWidth / 2)) * 0.7;
+    this.chime.strike(this.freqs[col], 0.16, pan);
   }
 
-  /** Rewrite every glyph quad from the current shape of its strand. */
+  /** Rewrite every glyph quad from the cloth's current shape. */
   #updateCurtain() {
+    const { posX, posY, oldX, oldY } = this.cloth;
     const pos = this.posAttr.array;
-    const col = this.colAttr.array;
+    const col3 = this.colAttr.array;
     const half = this.glyphSize / 2;
-    const span = this.stringTop - this.stringBottom;
     const tint = new THREE.Color();
 
-    // Per-strand values are constant across its glyphs, so compute them once.
-    const glow = this.strings.map((s) => Math.min(1, s.energy * 150));
+    // Motion lights a strand, so the sheet warms where it is actually moving.
+    for (let c = 0; c < COLS; c++) {
+      let speed = 0;
+      for (let r = 1; r < ROWS; r++) {
+        const i = this.cloth.index(c, r);
+        speed += Math.abs(posX[i] - oldX[i]) + Math.abs(posY[i] - oldY[i]);
+      }
+      speed /= ROWS;
+      const moving = Math.min(1, speed / (this.cellW * 0.06));
+      this.glow[c] = Math.max(moving, this.glow[c] * 0.94);
+    }
 
     for (let q = 0; q < this.cells.length; q++) {
       const cell = this.cells[q];
-      const s = this.strings[cell.string];
-      const n = cell.node;
+      const i = this.cloth.index(cell.col, cell.row);
+      const cx = posX[i];
+      const cy = posY[i];
 
-      const t = n / (NODES - 1);
-      const cx = s.x + s.u[n];
-      const cy = this.stringTop - t * span;
-
-      // Tilt each letter to the strand's local direction, so the text bends
-      // with the wave instead of sliding along a rigid column.
-      const a = n === 0 ? 0 : n - 1;
-      const b = n === NODES - 1 ? n : n + 1;
-      const dx = s.u[b] - s.u[a];
-      const dy = -((b - a) / (NODES - 1)) * span;
+      // Each letter lies along its strand, so the text bends with the fold.
+      let dx;
+      let dy;
+      if (cell.row < ROWS - 1) {
+        const below = this.cloth.index(cell.col, cell.row + 1);
+        dx = posX[below] - cx;
+        dy = posY[below] - cy;
+      } else {
+        const above = this.cloth.index(cell.col, cell.row - 1);
+        dx = cx - posX[above];
+        dy = cy - posY[above];
+      }
       const angle = Math.atan2(dy, dx) + Math.PI / 2;
       const cos = Math.cos(angle);
       const sin = Math.sin(angle);
@@ -485,17 +504,17 @@ export class TempleStrings {
       const vy = half * cos;
 
       const o = q * 12;
-      pos[o]      = cx - hx - vx; pos[o + 1]  = cy - hy - vy; pos[o + 2]  = 0;
-      pos[o + 3]  = cx + hx - vx; pos[o + 4]  = cy + hy - vy; pos[o + 5]  = 0;
-      pos[o + 6]  = cx + hx + vx; pos[o + 7]  = cy + hy + vy; pos[o + 8]  = 0;
-      pos[o + 9]  = cx - hx + vx; pos[o + 10] = cy - hy + vy; pos[o + 11] = 0;
+      pos[o]     = cx - hx - vx; pos[o + 1]  = cy - hy - vy; pos[o + 2]  = 0;
+      pos[o + 3] = cx + hx - vx; pos[o + 4]  = cy + hy - vy; pos[o + 5]  = 0;
+      pos[o + 6] = cx + hx + vx; pos[o + 7]  = cy + hy + vy; pos[o + 8]  = 0;
+      pos[o + 9] = cx - hx + vx; pos[o + 10] = cy - hy + vy; pos[o + 11] = 0;
 
-      tint.copy(REST_COLOR).lerp(RING_COLOR, glow[cell.string]);
-      const c = q * 12;
+      tint.copy(REST_COLOR).lerp(RING_COLOR, this.glow[cell.col]);
+      const cbase = q * 12;
       for (let v = 0; v < 4; v++) {
-        col[c + v * 3] = tint.r;
-        col[c + v * 3 + 1] = tint.g;
-        col[c + v * 3 + 2] = tint.b;
+        col3[cbase + v * 3] = tint.r;
+        col3[cbase + v * 3 + 1] = tint.g;
+        col3[cbase + v * 3 + 2] = tint.b;
       }
     }
 
@@ -507,24 +526,24 @@ export class TempleStrings {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.tick);
 
-    // Belt and braces. The scene has to stay registered with the CSS-painted
-    // backdrop, and a missed layout leaves the pavilion floating off the
-    // painting — so confirm the box every frame rather than trusting that a
-    // resize notification always arrives.
     const cw = this.container.clientWidth;
     const ch = this.container.clientHeight;
     if (cw && ch && cw * 100000 + ch !== this.laidOutAt) this.onResize();
 
     const now = performance.now();
     const elapsed = (now - this.startedAt) / 1000;
-
-    // Normalised against 60fps so the shove doesn't scale with refresh rate.
-    const dtScale = this.lastFrameAt ? Math.min(3, (now - this.lastFrameAt) / 16.667) : 1;
+    const frameMs = this.lastFrameAt ? now - this.lastFrameAt : STEP_MS;
     this.lastFrameAt = now;
 
     this.#breeze(now);
-    this.#applyWind(dtScale);
-    for (const s of this.strings) s.step();
+
+    // Fixed steps, so the drape is the same on a 144Hz display as on a 60Hz one.
+    this.accumulator = Math.min(this.accumulator + frameMs, STEP_MS * MAX_STEPS_PER_FRAME);
+    while (this.accumulator >= STEP_MS) {
+      this.cloth.step(this.gravity, DAMPING, ITERATIONS);
+      this.accumulator -= STEP_MS;
+    }
+
     this.#updateCurtain();
 
     const dustPos = this.dust.geometry.attributes.position;
@@ -547,7 +566,9 @@ export class TempleStrings {
 
     this.resizeObserver.disconnect();
     this.container.removeEventListener("pointermove", this.onPointerMove);
+    this.container.removeEventListener("pointerdown", this.onPointerDown);
     this.container.removeEventListener("pointerleave", this.onPointerLeave);
+    window.removeEventListener("pointerup", this.onPointerUp);
 
     this.curtain.geometry.dispose();
     this.curtain.material.dispose();

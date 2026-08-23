@@ -22,35 +22,53 @@ start every `AudioContext` suspended and only a real user gesture may resume it.
 
 ## How it works
 
-**`src/lib/string-sim.js` — the strands.**
-Each string solves the 1D wave equation along its length rather than simulating
-free 2D particles:
+**`src/lib/cloth.js` — the cloth.**
+A verlet cloth: a grid of particles held by distance constraints, pinned along
+the top row, falling under gravity.
 
-```
-u[i]″ = c² · (u[i-1] − 2u[i] + u[i+1])
-```
+This replaced an earlier 1D model in which each strand stored only a lateral
+displacement. That could ripple, but it could never behave as cloth — a strand
+could not gather, fold, swing on its own hinge or hang under its own weight,
+because there was no second dimension for it to do any of that in. Here every
+particle moves freely in the plane and the sheet's shape is whatever the
+constraints and gravity settle on.
 
-Every node stores only its lateral displacement. This is far more stable than
-free verlet particles and physically truer — waves actually travel to the pinned
-ends, reflect, and interfere on the way back, which is what makes the motion read
-as a *string* rather than a wobbling rope. `c` is held below 1 to satisfy the
-Courant stability condition.
+Two families of constraint, and the difference between them is what makes it read
+as a curtain rather than a net:
 
-Each strand is pinned at the roof beam but **free at the bottom**, which is what
-a hanging curtain does. A free end needs a Neumann boundary — the last node copies
-its neighbour rather than being held at zero — and without it the sway dies
-completely, because a string clamped at both ends is a harp string, not a curtain.
+- **Vertical**, down each strand: barely allowed to stretch, free to compress.
+  These carry the weight.
+- **Horizontal**, between neighbouring strands: loose in both directions. They let
+  strands drift apart and bunch together while still dragging on one another,
+  which is what gives the sheet its cohesion.
 
-The strands are also damped like **cloth rather than wire**. With light damping
-each one rang on at its own natural frequency, so moments after a gust they had
-drifted out of phase and the curtain churned, with neighbours leaning opposite
-ways. Heavy damping and a near-uniform wave speed keep the whole curtain
-answering a gust as one sheet and settling together.
+Constraints are *slack*: they pull only when a link is shorter than its minimum or
+longer than its maximum, and do nothing in between. A cloth of stiff exact-length
+links behaves like a screen door. They are relaxed Gauss-Seidel style, five cheap
+sweeps rather than one exact solve.
 
-Displacement is capped relative to the spacing between neighbours, so no amount of
-frantic input turns the text into an unreadable pile. A strand already under
-tension resists further displacement, so repeated strikes ring it brighter instead
-of pushing it ever wider.
+Two things worth knowing about the numbers:
+
+- Every vertical link ends up carrying the weight of all the cloth beneath it, so
+  after five passes the sheet settles about **1.21x its cut length** — past what
+  the 1.1 stretch limit implies, because a slack constraint sharing a pinned
+  partner only closes half its error per pass. The sheet is therefore cut short by
+  that same factor and arrives at the intended length once hung.
+- The pointer's shove is expressed as a **multiple of gravity**, not as the
+  reference's bare constant. That constant does not survive the change of scale —
+  carried across faithfully it moved this sheet by a fifth of a pixel. A hanging
+  cloth is taut under its own weight, so a shove must be large against gravity
+  before it reads at all. Measured across a sweep, the response is linear: 20x
+  moves the sheet 12px, 45x moves it 40px and leaves nothing crossed over, 65x
+  reaches 77px but folds strands past one another and scrambles the text.
+
+Pushed hard, the sheet gathers into real folds — and then recovers, because
+gravity pulls every strand back under its own pin. A 239px deformation settles
+back to 3px on its own.
+
+The cloth can also be **taken hold of**: pointerdown pins the nearest particle to
+the cursor so a fold can be dragged out of the curtain by hand, and releasing it
+hands the particle back to gravity.
 
 **`src/lib/chime.js` — the sound.**
 A struck bowl is *inharmonic*: its partials are not integer multiples of the
@@ -98,44 +116,19 @@ The text reads *down* each strand rather than across the rows, with neighbouring
 strands offset from one another — indexing it the other way makes the curtain
 read as a paragraph instead of as hanging threads.
 
-Two different pointer responses, deliberately kept separate:
+Two pointer responses:
 
-- **Near** the curtain, the pointer acts as a **gust of wind**. Every strand
-  leans the *same* way at any instant — only the amount differs. Strands nearest
-  where the gust lands lean furthest and the rest trail off with distance, down
-  to a floor so that even the far edge stirs a little. Direction comes from the
-  pointer's horizontal travel, so dragging left blows the curtain left. The gust
-  outlives the movement that made it and dies over about a second, which lets the
-  curtain swing back and settle on its own instead of snapping straight the
-  moment the pointer stops. No sound.
-
-  Gust strength runs through a **compressive curve** rather than scaling linearly
-  with pointer speed. Linearly, a gentle drift was nearly inert while fast moves
-  already clamped at full strength, and raising the gain alone would only have
-  widened that gap — it cannot lift the quiet end without pushing the loud end
-  further into the clamp. An exponent below 1 lifts the quiet end and leaves the
-  loud end where it is:
-
-  | pointer speed | hem leans |
-  |---|---|
-  | very slow drift | 19 px |
-  | slow drift | 28 px |
-  | brisk flick | 63 px |
-
-  Note that the travel ceiling is both the clamp *and* the scale the wind leans
-  against, so raising it buys no headroom — it simply widens every gust in
-  proportion. It is set by how far the strongest gust should throw the hem.
-
-  An earlier version pushed strands *away* from the pointer on both sides. That
-  is what a solid object does, and it looked like a hole punched through the
-  fabric rather than cloth moving. Wind has one direction; that single change is
-  what makes it read as a curtain.
-
-- **Across** a strand, it is struck and rings. A strand counts as struck when the
-  pointer changes which *side* of it it is on between two frames — comparing
-  sides rather than measuring distance means a fast flick still catches every
-  strand it passed through, instead of skipping the ones that fell between two
-  pointer samples.
+- **Moving near** the cloth shoves particles radially away, falling off with
+  squared distance. There is no separate notion of wind any more — the cloth's own
+  structure carries the motion. Shoving a handful of particles aside drags their
+  neighbours along through the horizontal links, so the disturbance spreads across
+  the sheet and down each strand by itself.
+- **Crossing** a strand rings it. A strand counts as struck when the pointer
+  changes which *side* of it it is on between two frames; comparing sides rather
+  than distance means a fast flick still catches every strand it passed through.
+  With the cloth free to move in two dimensions a strand is no longer a straight
+  column, so the comparison is made against whichever of its particles is
+  currently level with the pointer.
 
 The roof is drawn last with `depthTest` off, so the strands appear to hang from
 behind the beam. Its size is capped by height on wide screens and by width on

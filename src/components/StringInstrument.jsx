@@ -13,6 +13,13 @@ export default function StringInstrument() {
     const scene = new TempleStrings(containerRef.current);
     sceneRef.current = scene;
 
+    // Dev-only handle for poking at the cloth from the console. Attached here
+    // rather than after arming, so inspecting the simulation never depends on
+    // audio being switched on. Vite strips this branch from production builds.
+    if (import.meta.env.DEV) {
+      window.__temple = { ...window.__temple, scene };
+    }
+
     // StrictMode mounts effects twice in development, so teardown has to be
     // complete — otherwise the second mount stacks a second render loop.
     return () => {
@@ -42,10 +49,8 @@ export default function StringInstrument() {
     sceneRef.current?.attachAudio(chime);
     setArmed(true);
 
-    // Dev-only handle for poking at the sim from the console. Vite strips this
-    // branch from production builds.
     if (import.meta.env.DEV) {
-      window.__temple = { scene: sceneRef.current, chime };
+      window.__temple = { ...window.__temple, scene: sceneRef.current, chime };
     }
   }
 
