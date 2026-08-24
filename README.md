@@ -300,3 +300,4 @@ Left alone for a while, a slow air current occasionally finds one strand.
 - Voices are capped at 56 and the ceiling is a safety valve, not a normal limit —
   one full sweep is 38 simultaneous voices and sweeps overlap.
 - `prefers-reduced-motion` is honoured for the UI animation.
+# temple-curtain
