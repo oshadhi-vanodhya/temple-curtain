@@ -26,6 +26,12 @@
  * is bright and hissing, while water heard across a courtyard has lost its top
  * end to the air and the walls long before it reaches you.
  *
+ * It is deliberately dark almost to the point of being felt rather than heard.
+ * Broadband noise above roughly a kilohertz is what the ear reads as hiss, and
+ * hiss is the opposite of calming however quiet it is — so the whole bed passes
+ * through a pair of cascaded low-passes that take the top off before anything
+ * else happens. What is left is closer to a slow burble than to a fall.
+ *
  * Over that bed fall occasional drops into standing water. A real drip is not a
  * click: it is the resonance of the bubble the drop leaves behind, which shrinks
  * as it collapses, so the pitch *rises* over the few tens of milliseconds it
@@ -129,31 +135,55 @@ export class Water {
 
     const rush = ctx.createBiquadFilter();
     rush.type = "bandpass";
-    rush.frequency.value = 1100;
-    rush.Q.value = 0.6;
+    rush.frequency.value = 680;
+    rush.Q.value = 0.8;
     const rushGain = ctx.createGain();
-    rushGain.gain.value = 0.5;
+    rushGain.gain.value = 0.22;
 
     const spray = ctx.createBiquadFilter();
     spray.type = "highpass";
     spray.frequency.value = 3400;
     spray.Q.value = 0.5;
     const sprayGain = ctx.createGain();
-    // Far lower than standing at the fall. Distance and walls eat the top end.
-    sprayGain.gain.value = 0.04;
+    // Barely there. This band is the hiss, and cutting it to nothing leaves a
+    // dull hum rather than water — it survives only as a hint of air.
+    sprayGain.gain.value = 0.022;
 
-    for (const [filter, gain] of [[body, bodyGain], [rush, rushGain], [spray, sprayGain]]) {
+    // Two gentle low-passes in series rather than one steep filter: a single
+    // pole leaves too much hiss, and a resonant filter would ring on the noise
+    // and sing. Cascading two shallow ones rolls the top off smoothly.
+    const veilA = ctx.createBiquadFilter();
+    veilA.type = "lowpass";
+    veilA.frequency.value = 940;
+    veilA.Q.value = 0.5;
+    const veilB = ctx.createBiquadFilter();
+    veilB.type = "lowpass";
+    veilB.frequency.value = 1700;
+    veilB.Q.value = 0.5;
+
+    // Body and rush are what carry the hiss, so only those two are veiled.
+    for (const [filter, gain] of [[body, bodyGain], [rush, rushGain]]) {
       source.connect(filter);
       filter.connect(gain);
-      gain.connect(panner);
+      gain.connect(veilA);
     }
+    veilA.connect(veilB);
+    veilB.connect(panner);
+
+    // The spray band skips the veil and goes straight through. Routed into it,
+    // the low-passes erase it completely and the bed becomes a dull hum with no
+    // sense of air at all; kept separate and very quiet, it reads as the faint
+    // sheen above water without bringing the hiss back.
+    source.connect(spray);
+    spray.connect(sprayGain);
+    sprayGain.connect(panner);
     panner.connect(this.out);
 
     // Most of the bed is heard through the room rather than directly.
     const dry = ctx.createGain();
-    dry.gain.value = 0.45;
+    dry.gain.value = 0.28;
     const wet = ctx.createGain();
-    wet.gain.value = 0.85;
+    wet.gain.value = 1.0;
     this.out.connect(dry);
     this.out.connect(wet);
     wet.connect(room);
@@ -173,16 +203,16 @@ export class Water {
 
     // Unrelated rates on purpose: shared or harmonically related ones would beat
     // together into an audible pulse.
-    this.#drift(0.031, 260, body.frequency);
-    this.#drift(0.047, 0.22, rushGain.gain);
-    this.#drift(0.019, 900, rush.frequency);
-    this.#drift(0.073, 0.07, sprayGain.gain);
-    this.#drift(0.013, 0.12, this.out.gain);
+    this.#drift(0.017, 120, body.frequency);
+    this.#drift(0.023, 0.09, rushGain.gain);
+    this.#drift(0.011, 320, rush.frequency);
+    this.#drift(0.037, 0.004, sprayGain.gain);
+    this.#drift(0.008, 0.05, this.out.gain);
 
     source.start();
     this.source = source;
     this.#scheduleDrips();
-    this.nodes.push(source, panner, body, bodyGain, rush, rushGain, spray, sprayGain);
+    this.nodes.push(source, panner, body, bodyGain, rush, rushGain, spray, sprayGain, veilA, veilB);
   }
 
   /** A slow sine riding on an AudioParam, added to whatever else drives it. */
@@ -209,7 +239,7 @@ export class Water {
     osc.frequency.exponentialRampToValueAtTime(f0 * (1.7 + Math.random() * 0.7), now + 0.05 + Math.random() * 0.03);
 
     const g = ctx.createGain();
-    const peak = 0.05 + Math.random() * 0.05;
+    const peak = 0.022 + Math.random() * 0.026;
     g.gain.setValueAtTime(0.0001, now);
     g.gain.exponentialRampToValueAtTime(peak, now + 0.004);
     g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18 + Math.random() * 0.14);
@@ -233,9 +263,9 @@ export class Water {
       if (this.disposed) return;
       this.#drip();
       // Irregular on purpose: an even cadence reads as a metronome, not a leak.
-      this.dripTimer = setTimeout(tick, 4200 + Math.random() * 9000);
+      this.dripTimer = setTimeout(tick, 7000 + Math.random() * 13000);
     };
-    this.dripTimer = setTimeout(tick, 2500 + Math.random() * 5000);
+    this.dripTimer = setTimeout(tick, 4000 + Math.random() * 6000);
   }
 
   /** Fade to a level over `seconds`; the water should never simply appear. */

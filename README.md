@@ -90,12 +90,22 @@ one another; measured over twelve seconds the mid band swells and recedes by
 cross-faded into its head as well, since a looping noise buffer otherwise ticks
 once per cycle, and that tick is the one cue that gives a loop away.
 
-The water is heard from inside the temple, not from the foot of the fall. Two
-things carry that: it is set in a short, dark stone room of its own — quite unlike
-the chime's hall — and the spray band is pulled right down, because close water is
-bright and hissing while water heard across a courtyard has lost its top end to
-the air long before it arrives. Measured, that tilts the spectrum 34 dB from low
-band to high.
+The water is heard from inside the temple, not from the foot of the fall, and it
+is deliberately dark almost to the point of being felt rather than heard.
+
+Broadband noise above roughly a kilohertz is what the ear reads as hiss, and hiss
+is the opposite of calming however quiet it is. So the body and rush bands pass
+through a pair of cascaded low-passes — two shallow ones rather than one steep
+filter, since a resonant filter would ring on the noise and sing. Measured against
+an earlier, noisier version, that puts the 1-4 kHz band **20 dB down** while
+costing the low body only 3 dB.
+
+The spray band deliberately *bypasses* that veil. Routed through it, the
+low-passes erase it completely and the bed becomes a dull hum with no sense of air
+at all; kept separate and very quiet, it reads as the faint sheen above water
+without bringing the hiss back. It is also set in a short, dark stone room of its
+own, quite unlike the chime's hall, with most of the bed arriving as reflected
+rather than direct sound.
 
 Over that bed fall occasional drops into standing water. A drip is not a click: it
 is the resonance of the bubble the drop leaves behind, which shrinks as it

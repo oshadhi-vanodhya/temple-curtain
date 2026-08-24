@@ -55,7 +55,7 @@ export default function StringInstrument() {
     // The waterfall is always running; it just fades up rather than cutting in.
     if (!waterRef.current) {
       waterRef.current = new Water(chime.ctx, chime.ambientBus);
-      waterRef.current.fadeTo(0.16, 5);
+      waterRef.current.fadeTo(0.085, 8);
     }
 
     setArmed(true);
