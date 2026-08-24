@@ -110,7 +110,7 @@ completely. Every bound was measured off the image rather than eyeballed:
 | | fraction of artwork |
 |---|---|
 | underside of the beam | 0.437 |
-| foot of the pillar bases | 0.926 |
+| foot of the pillar bases | 0.923 |
 | inner faces of the pillar shafts | 0.384 / 0.621 |
 
 The beam edge was found by luminance rather than by eye: across the middle of the

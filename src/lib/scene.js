@@ -19,12 +19,12 @@ const BACKDROP_ASPECT = 1700 / 925;
  *            bracket work against the sky behind it. The curtain starts here and
  *            not above — nothing occludes the cloth, so a strand hung higher
  *            would draw on top of the painted beam.
- *   - 0.926  the foot of the pillar bases, where they meet the paving.
+ *   - 0.923  the foot of the pillar bases, where they meet the paving.
  *   - 0.384 / 0.621  the inner faces of the lacquered shafts. The gold dragon
  *            inlay breaks each shaft into fragments, so these came from a
  *            smoothed red-density profile rather than a solid-colour run.
  */
-const GATE = { left: 0.386, right: 0.6185, top: 0.437, bottom: 0.925 };
+const GATE = { left: 0.386, right: 0.6185, top: 0.437, bottom: 0.923 };
 
 /**
  * The feet of the painted waterfalls, as fractions of the artwork, where spray
