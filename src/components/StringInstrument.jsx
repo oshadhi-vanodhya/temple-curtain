@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { TempleStrings } from "../lib/scene.js";
 import { ChimeEngine } from "../lib/chime.js";
+import { Water } from "../lib/water.js";
 
 export default function StringInstrument() {
   const containerRef = useRef(null);
   const sceneRef = useRef(null);
   const chimeRef = useRef(null);
+  const waterRef = useRef(null);
 
   const [armed, setArmed] = useState(false);
 
@@ -30,6 +32,8 @@ export default function StringInstrument() {
 
   useEffect(() => {
     return () => {
+      waterRef.current?.dispose();
+      waterRef.current = null;
       chimeRef.current?.dispose();
       chimeRef.current = null;
     };
@@ -47,6 +51,13 @@ export default function StringInstrument() {
     if (!ok) return;
 
     sceneRef.current?.attachAudio(chime);
+
+    // The waterfall is always running; it just fades up rather than cutting in.
+    if (!waterRef.current) {
+      waterRef.current = new Water(chime.ctx, chime.ambientBus);
+      waterRef.current.fadeTo(0.16, 5);
+    }
+
     setArmed(true);
 
     if (import.meta.env.DEV) {

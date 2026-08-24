@@ -70,6 +70,31 @@ The cloth can also be **taken hold of**: pointerdown pins the nearest particle t
 the cursor so a fold can be dragged out of the curtain by hand, and releasing it
 hands the particle back to gravity.
 
+**`src/lib/water.js` — the waterfall.**
+A faint, continuous wash under everything, synthesised like the chime but by the
+opposite method. Falling water has no pitch — it is broadband noise shaped by the
+size of the drops and the space around them — so where the chime is built from
+partials, this starts as noise and is carved into three bands: a low body where
+water meets the pool, a mid rush for the bulk of the fall, and a high sparkle for
+the spray.
+
+Pink noise rather than white: white puts equal energy in every hertz, which reads
+as a bright electronic hiss, while pink falls away with frequency the way natural
+broadband sound does. Measured off the bus, the bands run -73, -81, -90 and -99 dB
+from low to high — a steady roll-off, no tonal peak.
+
+What stops it being a hiss is that nothing holds still. Slow oscillators at
+deliberately unrelated rates drift the filter frequencies and band levels against
+one another; measured over twelve seconds the mid band swells and recedes by
+11 dB and the high band by 6 dB, independently. The noise buffer's tail is
+cross-faded into its head as well, since a looping noise buffer otherwise ticks
+once per cycle, and that tick is the one cue that gives a loop away.
+
+It sits about 20 dB below a chime strike, and is panned left to the painted fall.
+It runs on a dry bus that shares the tone shaping and limiter with the chime but
+skips the reverb send — putting broadband noise through a hall impulse only smears
+it.
+
 **`src/lib/chime.js` — the sound.**
 Modelled on the **bianzhong** (编钟), the bronze chime-bells of ancient China,
 rather than on a Western bell or a Himalayan bowl. Fully synthesised — no samples.

@@ -98,6 +98,12 @@ export class ChimeEngine {
 
     master.connect(tone);
     tone.connect(limiter);
+
+    // A dry path for continuous ambience. It shares the tone shaping and the
+    // limiter so the whole mix stays controlled, but skips the reverb send —
+    // running broadband noise through a hall impulse only smears it.
+    this.ambientBus = ctx.createGain();
+    this.ambientBus.connect(tone);
     limiter.connect(ctx.destination);
 
     master.connect(reverb);
@@ -116,6 +122,7 @@ export class ChimeEngine {
       await ctx.close();
       this.ctx = null;
       this.master = null;
+      this.ambientBus = null;
       return false;
     }
 
