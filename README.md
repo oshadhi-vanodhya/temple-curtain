@@ -121,6 +121,27 @@ These fractions are converted into world space using the same `cover` fit the CS
 applies, so the curtain stays pinned inside the gateway at any viewport rather
 than drifting off it when the window changes shape.
 
+**`src/lib/mist.js` — spray at the waterfalls.**
+Soft plumes drift up from the foot of each painted fall, which are located by
+their artwork fractions the same way the gateway is, so they stay on the water at
+any viewport.
+
+Puffs are quads rather than GL points: `gl_PointSize` is capped by the driver, and
+a puff wide enough to read as spray on a high-DPI screen can exceed that cap and
+be silently clamped to a smaller square.
+
+Additive blending is the obvious choice for mist and is wrong here. The canvas is
+transparent and the painting is a CSS background *behind* it, so there is nothing
+in the framebuffer to add to — puffs accumulate colour against black and composite
+over the page as **grey stains**, which is exactly what the first attempt looked
+like. They are drawn with ordinary alpha blending instead: translucent white laid
+over the painting, which is what mist looks like anyway.
+
+That needs a per-puff opacity, and `MeshBasicMaterial` cannot give one — vertex
+colours drive RGB only, so fading a puff by darkening it turns it grey rather than
+transparent. Hence a small shader whose only job is to carry an alpha attribute
+through to the fragment.
+
 **`src/lib/glyph-atlas.js` + `src/lib/scene.js` — the curtain.**
 Every distinct character is packed into a single canvas atlas, so the whole
 curtain draws in **one draw call** rather than one per letter. Each glyph is a

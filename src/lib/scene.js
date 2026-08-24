@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Cloth } from "./cloth.js";
 import { buildGlyphAtlas } from "./glyph-atlas.js";
+import { Mist } from "./mist.js";
 
 const COLS = 38;
 const ROWS = 48;
@@ -28,6 +29,22 @@ const BACKDROP_ASPECT = 1700 / 925;
  * the painted one.
  */
 const GATE = { left: 0.386, right: 0.6135, top: 0.369, bottom: 0.94 };
+
+/**
+ * The feet of the painted waterfalls, as fractions of the artwork, where spray
+ * should gather. Read off the image: the tall fall on the right runs from y 0.44
+ * down to about 0.57, the main left fall from 0.655 to 0.742, and there is a
+ * slighter one higher up on the left.
+ *
+ * `spread` and `size` are fractions of the panel width, so a plume keeps its
+ * proportions against the painting at any viewport rather than being fixed in
+ * world units and drifting out of scale when the window changes shape.
+ */
+const WATERFALLS = [
+  { x: 0.086, y: 0.630, spread: 0.014, size: 0.026, rise: 0.26, intensity: 0.30 },
+  { x: 0.163, y: 0.738, spread: 0.024, size: 0.034, rise: 0.30, intensity: 0.36 },
+  { x: 0.873, y: 0.562, spread: 0.023, size: 0.035, rise: 0.30, intensity: 0.36 },
+];
 
 const CURTAIN_TEXT = "THE STRINGS REMEMBER EVERY HAND THAT HAS PASSED THROUGH THEM ";
 
@@ -131,6 +148,8 @@ export class TempleStrings {
     this.accumulator = 0;
 
     this.#buildCurtain();
+    this.mist = new Mist();
+    this.scene.add(this.mist.mesh);
     this.#buildDust();
 
     this.onResize = this.onResize.bind(this);
@@ -316,6 +335,18 @@ export class TempleStrings {
       dustPos.array[i * 3] = this.dustNorm[i] * this.worldWidth;
     }
     dustPos.needsUpdate = true;
+
+    // Plumes follow the artwork, so they stay on the falls through any resize.
+    this.mist.layout(
+      WATERFALLS.map((f) => ({
+        x: (f.x - 0.5) * this.panelWidth,
+        y: (0.5 - f.y) * this.panelHeight,
+        spread: f.spread * this.panelWidth,
+        size: f.size * this.panelWidth,
+        rise: f.rise * this.panelHeight * 0.1,
+        intensity: f.intensity,
+      }))
+    );
   }
 
   #toWorld(e) {
@@ -567,6 +598,7 @@ export class TempleStrings {
     }
 
     this.#updateCurtain();
+    this.mist.update(Math.min(frameMs, 100) / 1000, elapsed);
 
     const dustPos = this.dust.geometry.attributes.position;
     for (let i = 0; i < this.dustSeeds.length; i++) {
@@ -595,6 +627,8 @@ export class TempleStrings {
     this.curtain.geometry.dispose();
     this.curtain.material.dispose();
     this.atlasTexture.dispose();
+
+    this.mist.dispose();
 
     this.dust.geometry.dispose();
     this.dust.material.dispose();
