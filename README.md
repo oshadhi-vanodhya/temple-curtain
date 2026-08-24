@@ -121,7 +121,10 @@ These fractions are converted into world space using the same `cover` fit the CS
 applies, so the curtain stays pinned inside the gateway at any viewport rather
 than drifting off it when the window changes shape.
 
-**`src/lib/mist.js` — spray at the waterfalls.**
+**`src/lib/puffs.js`, `mist.js`, `clouds.js` — vapour.**
+Two effects share one implementation: spray rising from the painted waterfalls,
+and cloud drifting across the sky. `puffs.js` owns the technique; the other two
+own only the motion.
 Soft plumes drift up from the foot of each painted fall, which are located by
 their artwork fractions the same way the gateway is, so they stay on the water at
 any viewport.
@@ -141,6 +144,20 @@ That needs a per-puff opacity, and `MeshBasicMaterial` cannot give one — verte
 colours drive RGB only, so fading a puff by darkening it turns it grey rather than
 transparent. Hence a small shader whose only job is to carry an alpha attribute
 through to the fragment.
+
+Overlapping alpha compounds as `1 - (1 - a)^n`, so a tight cluster of strong puffs
+goes almost opaque and reads as a hard white spot rather than as vapour. Spray is
+therefore spread wide and kept faint, and gets its density from overlap rather
+than from any single puff.
+
+**Cloud** wisps are far wider than they are tall, fainter still, and cross the sky
+at a crawl, wrapping when they leave the frame. The one thing they must not do is
+pass over the painted pavilion: the backdrop is a CSS background *behind* the
+canvas, so anything drawn here sits on top of the gateway's roof, and a wisp
+crossing it would read as fog inside the building rather than behind it. The
+roof's dense red was measured at x 0.306–0.694, and each wisp is faded to nothing
+across a slightly wider span, so cloud dissolves before reaching it and reappears
+on the far side.
 
 **`src/lib/glyph-atlas.js` + `src/lib/scene.js` — the curtain.**
 Every distinct character is packed into a single canvas atlas, so the whole

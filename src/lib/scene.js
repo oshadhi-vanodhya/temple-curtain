@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { Cloth } from "./cloth.js";
 import { buildGlyphAtlas } from "./glyph-atlas.js";
 import { Mist } from "./mist.js";
+import { Clouds } from "./clouds.js";
 
 const COLS = 38;
 const ROWS = 48;
@@ -40,10 +41,31 @@ const GATE = { left: 0.386, right: 0.6135, top: 0.369, bottom: 0.94 };
  * proportions against the painting at any viewport rather than being fixed in
  * world units and drifting out of scale when the window changes shape.
  */
+/**
+ * The sky band cloud drifts through, in artwork fractions.
+ *
+ * `mask*` delimits the painted pavilion, whose dense red spans x 0.306 to 0.694.
+ * Cloud has to dissolve before it reaches that: the backdrop is a CSS background
+ * behind the canvas, so a wisp drawn over the gateway would read as fog inside
+ * the building rather than behind it. The bounds are set wider than the measured
+ * roof so the fade completes before the upturned eaves.
+ */
+const SKY = {
+  top: 0.035,
+  bottom: 0.38,
+  maskLeft: 0.27,
+  maskRight: 0.73,
+  maskFade: 0.075,
+  width: 0.19,
+  height: 0.075,
+  drift: 0.013,
+  intensity: 0.27,
+};
+
 const WATERFALLS = [
-  { x: 0.086, y: 0.630, spread: 0.014, size: 0.026, rise: 0.26, intensity: 0.30 },
-  { x: 0.163, y: 0.738, spread: 0.024, size: 0.034, rise: 0.30, intensity: 0.36 },
-  { x: 0.873, y: 0.562, spread: 0.023, size: 0.035, rise: 0.30, intensity: 0.36 },
+  { x: 0.086, y: 0.630, spread: 0.022, size: 0.034, rise: 0.26, intensity: 0.16 },
+  { x: 0.163, y: 0.738, spread: 0.036, size: 0.044, rise: 0.30, intensity: 0.19 },
+  { x: 0.873, y: 0.562, spread: 0.034, size: 0.045, rise: 0.30, intensity: 0.19 },
 ];
 
 const CURTAIN_TEXT = "THE STRINGS REMEMBER EVERY HAND THAT HAS PASSED THROUGH THEM ";
@@ -150,6 +172,8 @@ export class TempleStrings {
     this.#buildCurtain();
     this.mist = new Mist();
     this.scene.add(this.mist.mesh);
+    this.clouds = new Clouds();
+    this.scene.add(this.clouds.mesh);
     this.#buildDust();
 
     this.onResize = this.onResize.bind(this);
@@ -335,6 +359,20 @@ export class TempleStrings {
       dustPos.array[i * 3] = this.dustNorm[i] * this.worldWidth;
     }
     dustPos.needsUpdate = true;
+
+    this.clouds.layout({
+      left: -this.panelWidth / 2,
+      right: this.panelWidth / 2,
+      top: (0.5 - SKY.top) * this.panelHeight,
+      bottom: (0.5 - SKY.bottom) * this.panelHeight,
+      maskLeft: (SKY.maskLeft - 0.5) * this.panelWidth,
+      maskRight: (SKY.maskRight - 0.5) * this.panelWidth,
+      maskFade: SKY.maskFade * this.panelWidth,
+      width: SKY.width * this.panelWidth,
+      height: SKY.height * this.panelHeight,
+      drift: SKY.drift * this.panelWidth,
+      intensity: SKY.intensity,
+    });
 
     // Plumes follow the artwork, so they stay on the falls through any resize.
     this.mist.layout(
@@ -598,7 +636,9 @@ export class TempleStrings {
     }
 
     this.#updateCurtain();
-    this.mist.update(Math.min(frameMs, 100) / 1000, elapsed);
+    const vaporDt = Math.min(frameMs, 100) / 1000;
+    this.mist.update(vaporDt, elapsed);
+    this.clouds.update(vaporDt, elapsed);
 
     const dustPos = this.dust.geometry.attributes.position;
     for (let i = 0; i < this.dustSeeds.length; i++) {
@@ -629,6 +669,7 @@ export class TempleStrings {
     this.atlasTexture.dispose();
 
     this.mist.dispose();
+    this.clouds.dispose();
 
     this.dust.geometry.dispose();
     this.dust.material.dispose();
