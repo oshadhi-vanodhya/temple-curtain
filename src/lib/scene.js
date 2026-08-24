@@ -50,19 +50,25 @@ const GATE = { left: 0.386, right: 0.6185, top: 0.437, bottom: 0.923 };
  */
 const SKY = {
   top: 0.02,
-  bottom: 0.46,
+  bottom: 0.50,
   // This backdrop's gateway is wider than the last one's: its roof spans roughly
   // x 0.30 to 0.72, and the eaves reach further still.
   maskLeft: 0.25,
   maskRight: 0.76,
   maskFade: 0.06,
-  width: 0.11,
-  height: 0.055,
-  drift: 0.017,
+  // Swept against a pixel readback rather than judged by eye. Past roughly 0.18
+  // panel-widths the far side of the frame measures ~90% covered and the
+  // painting disappears behind fog; these values average around a third of the
+  // sky meaningfully veiled, with peaks near 0.8 alpha — dreamy, still sheer.
+  width: 0.15,
+  height: 0.085,
+  // Slower than the spray. Cloud that visibly travels reads as weather; cloud
+  // that barely moves reads as atmosphere.
+  drift: 0.011,
   // Lower than before. The previous sky was pale cream, where white vapour
   // barely separated; this one is a saturated blue, against which the same
   // white reads immediately and needs far less of it.
-  intensity: 0.40,
+  intensity: 0.55,
 };
 
 

@@ -16,7 +16,7 @@ import { PuffField } from "./puffs.js";
 const TAU = Math.PI * 2;
 
 export class Clouds {
-  constructor(count = 140) {
+  constructor(count = 170) {
     this.count = count;
     this.band = null;
 
@@ -89,7 +89,7 @@ export class Clouds {
       else if (this.x[i] + this.w[i] < b.left) this.x[i] += span + this.w[i] * 2;
 
       // A slow vertical breathing keeps the sky from looking like a slide.
-      const y = this.y[i] + Math.sin(elapsed * 0.06 + this.seed[i]) * b.height * 0.35;
+      const y = this.y[i] + Math.sin(elapsed * 0.05 + this.seed[i]) * b.height * 0.5;
 
       // Thin out toward the top of the band, where the sky is palest.
       const height = (y - b.bottom) / Math.max(1e-6, b.top - b.bottom);

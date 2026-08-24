@@ -162,10 +162,16 @@ Wisp size, count and opacity are set against a pixel readback of the canvas
 overlay rather than judged by eye, because judging vapour by eye is what went
 wrong repeatedly. How much is needed depends entirely on what is behind it: on an
 earlier pale-cream backdrop white vapour was nearly invisible and had to be driven
-hard, while against this saturated blue sky the same white reads at less than half
-the strength. There is a ceiling too — pushed to 0.30 panel-widths per wisp, one
-side of the frame measured 98% covered, which erases the painting rather than
-veiling it. The one thing they must not do is
+hard, while against a saturated blue sky the same white reads at a fraction of the
+strength.
+
+The current settings average about a third of the sky meaningfully veiled with
+peaks near 0.8 alpha — enough to read as weather without hiding the painting. The
+ceiling is close by: at 0.18 panel-widths per wisp one side measures ~90% covered,
+and at 0.22 it whites out entirely.
+
+Cloud drifts more slowly than the spray rises. Cloud that visibly travels reads as
+weather; cloud that barely moves reads as atmosphere. The one thing they must not do is
 pass over the painted pavilion: the backdrop is a CSS background *behind* the
 canvas, so anything drawn here sits on top of the gateway's roof, and a wisp
 crossing it would read as fog inside the building rather than behind it. The
