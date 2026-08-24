@@ -51,15 +51,19 @@ const GATE = { left: 0.386, right: 0.6135, top: 0.369, bottom: 0.94 };
  * roof so the fade completes before the upturned eaves.
  */
 const SKY = {
-  top: 0.035,
-  bottom: 0.38,
+  top: 0.03,
+  // Carried well below the skyline on purpose. White vapour against the pale
+  // sky is nearly invisible — measured, it lifted the page by well under 1% —
+  // whereas the same vapour over the darker green mountains reads immediately.
+  // Most of the visible drift is therefore mountain mist rather than cloud.
+  bottom: 0.56,
   maskLeft: 0.27,
   maskRight: 0.73,
   maskFade: 0.075,
-  width: 0.19,
-  height: 0.075,
-  drift: 0.013,
-  intensity: 0.27,
+  width: 0.22,
+  height: 0.10,
+  drift: 0.015,
+  intensity: 0.55,
 };
 
 const WATERFALLS = [

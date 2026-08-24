@@ -150,8 +150,15 @@ goes almost opaque and reads as a hard white spot rather than as vapour. Spray i
 therefore spread wide and kept faint, and gets its density from overlap rather
 than from any single puff.
 
-**Cloud** wisps are far wider than they are tall, fainter still, and cross the sky
-at a crawl, wrapping when they leave the frame. The one thing they must not do is
+**Cloud** wisps are far wider than they are tall and cross the sky at a crawl,
+wrapping when they leave the frame.
+
+They deliberately reach well *below* the skyline. White vapour against this pale
+sky is close to invisible — measured off the canvas, an early pass lifted the page
+by 0.08% and could not be seen at all — whereas the same vapour drifting over the
+darker green mountains registers immediately. Most of the visible drift is
+therefore mountain mist rather than cloud, and the effect is 27x stronger than
+that first attempt. The one thing they must not do is
 pass over the painted pavilion: the backdrop is a CSS background *behind* the
 canvas, so anything drawn here sits on top of the gateway's roof, and a wisp
 crossing it would read as fog inside the building rather than behind it. The

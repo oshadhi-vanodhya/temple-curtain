@@ -16,13 +16,15 @@ import { PuffField } from "./puffs.js";
 const TAU = Math.PI * 2;
 
 export class Clouds {
-  constructor(count = 70) {
+  constructor(count = 96) {
     this.count = count;
     this.band = null;
 
     this.field = new PuffField({
-      // Softer even than the spray: a wisp should have no discernible edge.
-      stops: [[0, 0.5], [0.3, 0.3], [0.6, 0.12], [0.85, 0.03], [1, 0]],
+      // Soft-edged but with real substance at the core. At half this strength
+      // the texture halved an already-low per-wisp alpha and the whole effect
+      // measured under 1% of a change on screen.
+      stops: [[0, 0.95], [0.3, 0.6], [0.6, 0.26], [0.85, 0.07], [1, 0]],
       color: 0xfffefa,
       renderOrder: 1,
     });
