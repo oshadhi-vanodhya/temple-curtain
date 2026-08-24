@@ -60,17 +60,41 @@ const SKY = {
   // panel-widths the far side of the frame measures ~90% covered and the
   // painting disappears behind fog; these values average around a third of the
   // sky meaningfully veiled, with peaks near 0.8 alpha — dreamy, still sheer.
-  width: 0.15,
-  height: 0.085,
+  width: 0.165,
+  height: 0.095,
   // Slower than the spray. Cloud that visibly travels reads as weather; cloud
   // that barely moves reads as atmosphere.
   drift: 0.011,
   // Lower than before. The previous sky was pale cream, where white vapour
   // barely separated; this one is a saturated blue, against which the same
   // white reads immediately and needs far less of it.
-  intensity: 0.55,
+  intensity: 0.62,
 };
 
+
+/**
+ * A second, lower band of fog lying in the hills.
+ *
+ * Kept separate from the sky rather than simply widening that band, because the
+ * two want different things: sky cloud is thin and drifts, hill fog is broad,
+ * flat and nearly still. Driving one band hard enough to fill the mountains
+ * whites out the sky long before it gets there — measured, past 0.18
+ * panel-widths per wisp one side of the frame reads ~90% covered.
+ *
+ * It shares the gateway mask, since the pavilion spans that column of the image
+ * at every height.
+ */
+const MOUNTAIN_FOG = {
+  top: 0.40,
+  bottom: 0.72,
+  maskLeft: 0.25,
+  maskRight: 0.76,
+  maskFade: 0.06,
+  width: 0.21,
+  height: 0.06,
+  drift: 0.007,
+  intensity: 0.5,
+};
 
 const WATERFALLS = [
   // A single cascade on the left, running x 0.075-0.135 from y 0.56 down to the
@@ -200,6 +224,8 @@ export class TempleStrings {
     this.scene.add(this.mist.mesh);
     this.clouds = new Clouds();
     this.scene.add(this.clouds.mesh);
+    this.hillFog = new Clouds(130);
+    this.scene.add(this.hillFog.mesh);
     this.#buildDust();
 
     this.onResize = this.onResize.bind(this);
@@ -417,6 +443,20 @@ export class TempleStrings {
       height: SKY.height * this.panelHeight,
       drift: SKY.drift * this.panelWidth,
       intensity: SKY.intensity,
+    });
+
+    this.hillFog.layout({
+      left: -this.panelWidth / 2,
+      right: this.panelWidth / 2,
+      top: (0.5 - MOUNTAIN_FOG.top) * this.panelHeight,
+      bottom: (0.5 - MOUNTAIN_FOG.bottom) * this.panelHeight,
+      maskLeft: (MOUNTAIN_FOG.maskLeft - 0.5) * this.panelWidth,
+      maskRight: (MOUNTAIN_FOG.maskRight - 0.5) * this.panelWidth,
+      maskFade: MOUNTAIN_FOG.maskFade * this.panelWidth,
+      width: MOUNTAIN_FOG.width * this.panelWidth,
+      height: MOUNTAIN_FOG.height * this.panelHeight,
+      drift: MOUNTAIN_FOG.drift * this.panelWidth,
+      intensity: MOUNTAIN_FOG.intensity,
     });
 
     // Plumes follow the artwork, so they stay on the falls through any resize.
@@ -684,6 +724,7 @@ export class TempleStrings {
     const vaporDt = Math.min(frameMs, 100) / 1000;
     this.mist.update(vaporDt, elapsed);
     this.clouds.update(vaporDt, elapsed);
+    this.hillFog.update(vaporDt, elapsed * 0.7);
 
     const dustPos = this.dust.geometry.attributes.position;
     for (let i = 0; i < this.dustSeeds.length; i++) {
@@ -718,6 +759,7 @@ export class TempleStrings {
 
     this.mist.dispose();
     this.clouds.dispose();
+    this.hillFog.dispose();
 
     this.dust.geometry.dispose();
     this.dust.material.dispose();

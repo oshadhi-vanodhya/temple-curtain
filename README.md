@@ -171,7 +171,14 @@ ceiling is close by: at 0.18 panel-widths per wisp one side measures ~90% covere
 and at 0.22 it whites out entirely.
 
 Cloud drifts more slowly than the spray rises. Cloud that visibly travels reads as
-weather; cloud that barely moves reads as atmosphere. The one thing they must not do is
+weather; cloud that barely moves reads as atmosphere.
+
+There are **two bands**, not one: thin drifting cloud in the sky, and a broader,
+flatter, nearly still layer of fog lying in the hills below it. They are kept
+separate because they want different settings — driving a single band hard enough
+to fill the mountains whites out the sky long before it reaches them. Both share
+the gateway mask, since the pavilion spans that column of the image at every
+height, and both are verified to leave the opening completely clear. The one thing they must not do is
 pass over the painted pavilion: the backdrop is a CSS background *behind* the
 canvas, so anything drawn here sits on top of the gateway's roof, and a wisp
 crossing it would read as fog inside the building rather than behind it. The
