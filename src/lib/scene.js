@@ -11,25 +11,20 @@ const WORLD_HEIGHT = 10;
 const BACKDROP_ASPECT = 1700 / 925;
 
 /**
- * The painted gateway's opening, as fractions of the artwork. Every value
- * measured off the image rather than eyeballed:
+ * The painted gateway's opening, as fractions of the artwork. Re-measured for
+ * this backdrop; every value read off the image rather than eyeballed:
  *
- *   - 0.369  underside of the bracket work spanning the pillars; below this row
- *            the middle of the arch is open sky. The curtain starts here and not
- *            above it — nothing occludes the cloth, so a strand hung any higher
+ *   - 0.437  underside of the beam. Luminance across the middle of the arch
+ *            jumps from 132 to 224 in one row there, which is the edge of the
+ *            bracket work against the sky behind it. The curtain starts here and
+ *            not above — nothing occludes the cloth, so a strand hung higher
  *            would draw on top of the painted beam.
- *   - 0.940  the foot of the plinths, where they meet the paving.
- *   - 0.383 / 0.617  the inner faces of the lacquered shafts, which stay
- *            constant all the way down.
- *
- * Between them these are the full height and width of the opening, so the
- * curtain fills the gateway instead of floating inside it.
- *
- * It hangs here rather than from a roof of its own: this backdrop supplies its
- * own pavilion, and a separate roof plane would just be a second roof stacked on
- * the painted one.
+ *   - 0.926  the foot of the pillar bases, where they meet the paving.
+ *   - 0.384 / 0.621  the inner faces of the lacquered shafts. The gold dragon
+ *            inlay breaks each shaft into fragments, so these came from a
+ *            smoothed red-density profile rather than a solid-colour run.
  */
-const GATE = { left: 0.386, right: 0.6135, top: 0.369, bottom: 0.94 };
+const GATE = { left: 0.386, right: 0.6185, top: 0.437, bottom: 0.925 };
 
 /**
  * The feet of the painted waterfalls, as fractions of the artwork, where spray
@@ -51,32 +46,30 @@ const GATE = { left: 0.386, right: 0.6135, top: 0.369, bottom: 0.94 };
  * roof so the fade completes before the upturned eaves.
  */
 const SKY = {
-  top: 0.03,
-  // Carried well below the skyline on purpose. White vapour against the pale
-  // sky is nearly invisible — measured, it lifted the page by well under 1% —
-  // whereas the same vapour over the darker green mountains reads immediately.
-  // Most of the visible drift is therefore mountain mist rather than cloud.
-  bottom: 0.56,
-  maskLeft: 0.27,
-  maskRight: 0.73,
-  maskFade: 0.075,
-  // Swept against a pixel readback of the canvas overlay rather than guessed.
-  // Wider/stronger than this and the sides white out — at 0.30 width the right
-  // of the frame measured 98% covered, which erases the painting instead of
-  // veiling it. Here the peaks reach ~0.8 alpha while only a tenth to a fifth of
-  // the area is meaningfully covered, so the mist reads as distinct drifting
-  // banks with the landscape still showing through.
+  top: 0.02,
+  bottom: 0.46,
+  // This backdrop's gateway is wider than the last one's: its roof spans roughly
+  // x 0.30 to 0.72, and the eaves reach further still.
+  maskLeft: 0.25,
+  maskRight: 0.76,
+  maskFade: 0.06,
   width: 0.11,
   height: 0.055,
   drift: 0.017,
-  intensity: 0.65,
+  // Lower than before. The previous sky was pale cream, where white vapour
+  // barely separated; this one is a saturated blue, against which the same
+  // white reads immediately and needs far less of it.
+  intensity: 0.40,
 };
 
+
 const WATERFALLS = [
-  { x: 0.086, y: 0.630, spread: 0.022, size: 0.034, rise: 0.26, intensity: 0.16 },
-  { x: 0.163, y: 0.738, spread: 0.036, size: 0.044, rise: 0.30, intensity: 0.19 },
-  { x: 0.873, y: 0.562, spread: 0.034, size: 0.045, rise: 0.30, intensity: 0.19 },
+  // A single cascade on the left, running x 0.075-0.135 from y 0.56 down to the
+  // pool at 0.78. Two sources: spray off the pool, and a lighter veil halfway up.
+  { x: 0.105, y: 0.775, spread: 0.030, size: 0.038, rise: 0.30, intensity: 0.24 },
+  { x: 0.107, y: 0.660, spread: 0.024, size: 0.030, rise: 0.24, intensity: 0.15 },
 ];
+
 
 const CURTAIN_TEXT = "THE STRINGS REMEMBER EVERY HAND THAT HAS PASSED THROUGH THEM ";
 

@@ -109,13 +109,18 @@ completely. Every bound was measured off the image rather than eyeballed:
 
 | | fraction of artwork |
 |---|---|
-| underside of the bracket work | 0.369 |
-| foot of the plinths | 0.940 |
-| inner faces of the pillar shafts | 0.383 / 0.617 |
+| underside of the beam | 0.437 |
+| foot of the pillar bases | 0.926 |
+| inner faces of the pillar shafts | 0.384 / 0.621 |
 
-The top matters particularly: nothing occludes the cloth any more, so a strand
-hung above 0.369 would draw *on top of* the painted beam rather than emerging
-from beneath it.
+The beam edge was found by luminance rather than by eye: across the middle of the
+arch it jumps from 132 to 224 in a single row. The pillars' gold dragon inlay
+breaks each shaft into fragments, so their inner faces came from a smoothed
+red-density profile rather than a solid-colour run.
+
+The top bound matters particularly: nothing occludes the cloth, so a strand hung
+above 0.437 would draw *on top of* the painted beam rather than emerging from
+beneath it.
 
 These fractions are converted into world space using the same `cover` fit the CSS
 applies, so the curtain stays pinned inside the gateway at any viewport rather
@@ -153,19 +158,14 @@ than from any single puff.
 **Cloud** wisps are far wider than they are tall and cross the sky at a crawl,
 wrapping when they leave the frame.
 
-They deliberately reach well *below* the skyline. White vapour against this pale
-sky is close to invisible — measured off the canvas, an early pass lifted the page
-by 0.08% and could not be seen at all — whereas the same vapour drifting over the
-darker green mountains registers immediately. Most of the visible drift is
-therefore mountain mist rather than cloud.
-
-Wisp size, count and opacity were swept against a pixel readback of the canvas
-overlay rather than judged by eye, because judging vapour by eye on a pale
-painting is exactly what went wrong twice. Too wide and the sides white out — at
-0.30 panel-widths the right of the frame measured 98% covered, which erases the
-painting instead of veiling it. The settled values put peaks near 0.8 alpha with
-a fifth to a third of the area meaningfully covered: distinct drifting banks, with
-the landscape still showing through. The one thing they must not do is
+Wisp size, count and opacity are set against a pixel readback of the canvas
+overlay rather than judged by eye, because judging vapour by eye is what went
+wrong repeatedly. How much is needed depends entirely on what is behind it: on an
+earlier pale-cream backdrop white vapour was nearly invisible and had to be driven
+hard, while against this saturated blue sky the same white reads at less than half
+the strength. There is a ceiling too — pushed to 0.30 panel-widths per wisp, one
+side of the frame measured 98% covered, which erases the painting rather than
+veiling it. The one thing they must not do is
 pass over the painted pavilion: the backdrop is a CSS background *behind* the
 canvas, so anything drawn here sits on top of the gateway's roof, and a wisp
 crossing it would read as fog inside the building rather than behind it. The
