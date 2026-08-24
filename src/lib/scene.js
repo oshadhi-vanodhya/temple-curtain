@@ -27,7 +27,34 @@ const BACKDROP_ASPECT = 1700 / 925;
  *            inlay breaks each shaft into fragments, so these came from a
  *            smoothed red-density profile rather than a solid-colour run.
  */
-const GATE = { left: 0.386, right: 0.6185, top: 0.437, bottom: 0.923 };
+const GATE = { left: 0.386, right: 0.6185, top: 0.4357, bottom: 0.923 };
+
+/**
+ * The soffit above the opening is not a straight line: the bracket work hangs
+ * lower near the pillars than it does at the centre. Measured across the opening
+ * it runs from 0.4876 at each edge up to 0.4357 in the middle — a shallow arch.
+ *
+ * A curtain with a flat top therefore crosses the carving at both ends, and the
+ * outermost strands draw over it. These are 25 evenly spaced samples of that
+ * profile, from GATE.left to GATE.right, used to clip the letters and to shape
+ * the screen behind them so both follow the timber.
+ */
+const SOFFIT = [
+  0.4876, 0.4724, 0.4584, 0.4497, 0.4411, 0.4357, 0.4357, 0.4357, 0.4357,
+  0.4357, 0.4357, 0.4357, 0.4357, 0.4357, 0.4357, 0.4357, 0.4357, 0.4357,
+  0.4357, 0.4357, 0.44, 0.4497, 0.4573, 0.4724, 0.4876,
+];
+
+/** A hair of daylight between the paint and the topmost letters. */
+const SOFFIT_CLEARANCE = 0.002;
+
+/** Interpolated soffit height at `t` across the opening, 0 at left, 1 at right. */
+function soffitAt(t) {
+  const f = Math.min(1, Math.max(0, t)) * (SOFFIT.length - 1);
+  const i = Math.min(SOFFIT.length - 2, Math.floor(f));
+  const k = f - i;
+  return SOFFIT[i] * (1 - k) + SOFFIT[i + 1] * k + SOFFIT_CLEARANCE;
+}
 
 /**
  * The feet of the painted waterfalls, as fractions of the artwork, where spray
@@ -253,8 +280,23 @@ export class TempleStrings {
   }
 
   #buildScrim() {
+    // A strip rather than a plane, so its top edge can follow the arched soffit.
+    this.scrimSegments = 48;
+    const verts = (this.scrimSegments + 1) * 2;
+    const geo = new THREE.BufferGeometry();
+    this.scrimPos = new THREE.BufferAttribute(new Float32Array(verts * 3), 3);
+    this.scrimPos.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute("position", this.scrimPos);
+
+    const idx = [];
+    for (let i = 0; i < this.scrimSegments; i++) {
+      const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+      idx.push(a, b, d, a, d, c);
+    }
+    geo.setIndex(idx);
+
     this.scrim = new THREE.Mesh(
-      new THREE.PlaneGeometry(1, 1),
+      geo,
       new THREE.MeshBasicMaterial({
         color: SCRIM_COLOR,
         transparent: true,
@@ -263,6 +305,7 @@ export class TempleStrings {
         depthWrite: false,
       })
     );
+    this.scrim.frustumCulled = false;
     this.scrim.renderOrder = 1; // over the backdrop, under the letters
     this.scene.add(this.scrim);
   }
@@ -398,9 +441,24 @@ export class TempleStrings {
     const bottom = (0.5 - GATE.bottom) * this.panelHeight;
     const span = right - left;
 
-    // The screen fills the opening exactly, so its edges meet the architecture.
-    this.scrim.scale.set(right - left, top - bottom, 1);
-    this.scrim.position.set((left + right) / 2, (top + bottom) / 2, 0);
+    // The screen fills the opening exactly, its top edge following the soffit.
+    const sp = this.scrimPos.array;
+    for (let i = 0; i <= this.scrimSegments; i++) {
+      const t = i / this.scrimSegments;
+      const x = left + (right - left) * t;
+      const yTop = (0.5 - soffitAt(t)) * this.panelHeight;
+      const o = i * 6;
+      sp[o] = x;     sp[o + 1] = yTop;  sp[o + 2] = 0;
+      sp[o + 3] = x; sp[o + 4] = bottom; sp[o + 5] = 0;
+    }
+    this.scrimPos.needsUpdate = true;
+
+    // Per-strand soffit height, for clipping letters that rise above the timber.
+    if (!this.soffitY) this.soffitY = new Float32Array(COLS);
+    for (let c = 0; c < COLS; c++) {
+      const t = COLS === 1 ? 0.5 : c / (COLS - 1);
+      this.soffitY[c] = (0.5 - soffitAt(t)) * this.panelHeight;
+    }
 
     this.cellW = span / (COLS - 1);
     this.cellH = (top - bottom) / (ROWS - 1) / DRAPE_SLACK;
@@ -657,6 +715,15 @@ export class TempleStrings {
       const i = this.cloth.index(cell.col, cell.row);
       const cx = posX[i];
       const cy = posY[i];
+
+      // Above the timber this strand hangs from: collapse the quad so the letter
+      // is not drawn over the carving. Tested against the glyph's top edge, not
+      // its centre — testing the centre still lets half a letter cross.
+      if (cy + half > this.soffitY[cell.col]) {
+        const o0 = q * 12;
+        for (let v = 0; v < 12; v++) pos[o0 + v] = 0;
+        continue;
+      }
 
       // Each letter lies along its strand, so the text bends with the fold.
       let dx;

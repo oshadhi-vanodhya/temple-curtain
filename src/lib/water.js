@@ -18,7 +18,40 @@
  * Pink rather than white noise because white noise puts equal energy in every
  * hertz, which our hearing reads as a bright electronic hiss; pink falls off
  * with frequency the way natural broadband sound does.
+ *
+ * The water is heard from inside a temple, not standing at the fall, and two
+ * things carry that. It is set in a stone room of its own — a short, dark
+ * convolution, quite unlike the chime's hall — so it arrives with walls around
+ * it rather than in the open. And the spray band is pulled well down: close water
+ * is bright and hissing, while water heard across a courtyard has lost its top
+ * end to the air and the walls long before it reaches you.
+ *
+ * Over that bed fall occasional drops into standing water. A real drip is not a
+ * click: it is the resonance of the bubble the drop leaves behind, which shrinks
+ * as it collapses, so the pitch *rises* over the few tens of milliseconds it
+ * sounds. Sweeping it upward is what separates a drip from a tap. They are sent
+ * mostly to the room, so each one answers from the stonework.
  */
+
+/** A short, dark room — stone and timber rather than a hall. */
+function buildRoomImpulse(ctx, seconds, decay) {
+  const rate = ctx.sampleRate;
+  const length = Math.floor(rate * seconds);
+  const impulse = ctx.createBuffer(2, length, rate);
+
+  for (let ch = 0; ch < 2; ch++) {
+    const data = impulse.getChannelData(ch);
+    let lp = 0;
+    for (let i = 0; i < length; i++) {
+      const t = i / length;
+      // One-pole lowpass on the noise darkens the tail, the way soft furnishings
+      // and open air take the top off real reflections.
+      lp += ((Math.random() * 2 - 1) - lp) * 0.34;
+      data[i] = lp * Math.pow(1 - t, decay);
+    }
+  }
+  return impulse;
+}
 
 /** Paul Kellett's pink-noise filter — white noise shaped to -3dB per octave. */
 function fillPink(data) {
@@ -57,6 +90,15 @@ export class Water {
   constructor(ctx, destination) {
     this.ctx = ctx;
     this.nodes = [];
+    this.disposed = false;
+
+    // A small dark room: stone and timber, not a cathedral.
+    const room = ctx.createConvolver();
+    room.buffer = buildRoomImpulse(ctx, 2.2, 3.4);
+    const roomLevel = ctx.createGain();
+    roomLevel.gain.value = 0.9;
+    room.connect(roomLevel);
+    this.room = room;
 
     const seconds = 8;
     const fade = Math.floor(ctx.sampleRate * 0.05);
@@ -97,7 +139,8 @@ export class Water {
     spray.frequency.value = 3400;
     spray.Q.value = 0.5;
     const sprayGain = ctx.createGain();
-    sprayGain.gain.value = 0.14;
+    // Far lower than standing at the fall. Distance and walls eat the top end.
+    sprayGain.gain.value = 0.04;
 
     for (const [filter, gain] of [[body, bodyGain], [rush, rushGain], [spray, sprayGain]]) {
       source.connect(filter);
@@ -105,7 +148,28 @@ export class Water {
       gain.connect(panner);
     }
     panner.connect(this.out);
-    this.out.connect(destination);
+
+    // Most of the bed is heard through the room rather than directly.
+    const dry = ctx.createGain();
+    dry.gain.value = 0.45;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.85;
+    this.out.connect(dry);
+    this.out.connect(wet);
+    wet.connect(room);
+    dry.connect(destination);
+    roomLevel.connect(destination);
+
+    // Drips are almost entirely reflected sound.
+    this.dripBus = ctx.createGain();
+    this.dripBus.gain.value = 1;
+    const dripDry = ctx.createGain();
+    dripDry.gain.value = 0.3;
+    this.dripBus.connect(dripDry);
+    this.dripBus.connect(room);
+    dripDry.connect(destination);
+
+    this.nodes.push(room, roomLevel, dry, wet, this.dripBus, dripDry);
 
     // Unrelated rates on purpose: shared or harmonically related ones would beat
     // together into an audible pulse.
@@ -117,6 +181,7 @@ export class Water {
 
     source.start();
     this.source = source;
+    this.#scheduleDrips();
     this.nodes.push(source, panner, body, bodyGain, rush, rushGain, spray, sprayGain);
   }
 
@@ -132,6 +197,47 @@ export class Water {
     this.nodes.push(lfo, amount);
   }
 
+  /** One drop into standing water: a bubble resonance, rising as it collapses. */
+  #drip() {
+    const ctx = this.ctx;
+    const now = ctx.currentTime;
+    const f0 = 560 + Math.random() * 620;
+
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(f0, now);
+    osc.frequency.exponentialRampToValueAtTime(f0 * (1.7 + Math.random() * 0.7), now + 0.05 + Math.random() * 0.03);
+
+    const g = ctx.createGain();
+    const peak = 0.05 + Math.random() * 0.05;
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(peak, now + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.18 + Math.random() * 0.14);
+
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = -0.55 + Math.random() * 0.35;
+
+    osc.connect(g);
+    g.connect(pan);
+    pan.connect(this.dripBus);
+    osc.start(now);
+    osc.stop(now + 0.4);
+    osc.onended = () => {
+      g.disconnect();
+      pan.disconnect();
+    };
+  }
+
+  #scheduleDrips() {
+    const tick = () => {
+      if (this.disposed) return;
+      this.#drip();
+      // Irregular on purpose: an even cadence reads as a metronome, not a leak.
+      this.dripTimer = setTimeout(tick, 4200 + Math.random() * 9000);
+    };
+    this.dripTimer = setTimeout(tick, 2500 + Math.random() * 5000);
+  }
+
   /** Fade to a level over `seconds`; the water should never simply appear. */
   fadeTo(level, seconds = 4) {
     const now = this.ctx.currentTime;
@@ -141,6 +247,8 @@ export class Water {
   }
 
   dispose() {
+    this.disposed = true;
+    clearTimeout(this.dripTimer);
     try {
       this.source.stop();
     } catch {

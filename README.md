@@ -90,6 +90,21 @@ one another; measured over twelve seconds the mid band swells and recedes by
 cross-faded into its head as well, since a looping noise buffer otherwise ticks
 once per cycle, and that tick is the one cue that gives a loop away.
 
+The water is heard from inside the temple, not from the foot of the fall. Two
+things carry that: it is set in a short, dark stone room of its own — quite unlike
+the chime's hall — and the spray band is pulled right down, because close water is
+bright and hissing while water heard across a courtyard has lost its top end to
+the air long before it arrives. Measured, that tilts the spectrum 34 dB from low
+band to high.
+
+Over that bed fall occasional drops into standing water. A drip is not a click: it
+is the resonance of the bubble the drop leaves behind, which shrinks as it
+collapses, so the pitch *rises* over the few tens of milliseconds it sounds.
+Sweeping it upward is what separates a drip from a tap. They arrive at irregular
+intervals — an even cadence reads as a metronome, not a leak — and go mostly to
+the room, so each one answers from the stonework. Measured, they peak about 6.6 dB
+above the bed.
+
 It sits about 20 dB below a chime strike, and is panned left to the painted fall.
 It runs on a dry bus that shares the tone shaping and limiter with the chime but
 skips the reverb send — putting broadband noise through a hall impulse only smears
@@ -139,7 +154,16 @@ completely. Every bound was measured off the image rather than eyeballed:
 | inner faces of the pillar shafts | 0.384 / 0.621 |
 
 The beam edge was found by luminance rather than by eye: across the middle of the
-arch it jumps from 132 to 224 in a single row. The pillars' gold dragon inlay
+arch it jumps from 132 to 224 in a single row.
+
+The soffit above the opening is **not a straight line** — the bracket work hangs
+to 0.4876 near the pillars but only 0.4357 at the centre. A curtain with a flat
+top therefore crosses the carving at both ends, which is what the outermost
+strands were doing. That profile is sampled across the opening and used twice:
+letters whose *top edge* rises above their own strand's soffit are dropped from
+the draw (testing the centre instead still lets half a letter cross), and the
+screen behind them is a shaped strip rather than a rectangle, so its upper edge
+follows the timber. The pillars' gold dragon inlay
 breaks each shaft into fragments, so their inner faces came from a smoothed
 red-density profile rather than a solid-colour run.
 
