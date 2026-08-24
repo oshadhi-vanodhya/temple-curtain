@@ -60,10 +60,16 @@ const SKY = {
   maskLeft: 0.27,
   maskRight: 0.73,
   maskFade: 0.075,
-  width: 0.22,
-  height: 0.10,
-  drift: 0.015,
-  intensity: 0.55,
+  // Swept against a pixel readback of the canvas overlay rather than guessed.
+  // Wider/stronger than this and the sides white out — at 0.30 width the right
+  // of the frame measured 98% covered, which erases the painting instead of
+  // veiling it. Here the peaks reach ~0.8 alpha while only a tenth to a fifth of
+  // the area is meaningfully covered, so the mist reads as distinct drifting
+  // banks with the landscape still showing through.
+  width: 0.11,
+  height: 0.055,
+  drift: 0.017,
+  intensity: 0.65,
 };
 
 const WATERFALLS = [

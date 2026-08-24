@@ -157,8 +157,15 @@ They deliberately reach well *below* the skyline. White vapour against this pale
 sky is close to invisible — measured off the canvas, an early pass lifted the page
 by 0.08% and could not be seen at all — whereas the same vapour drifting over the
 darker green mountains registers immediately. Most of the visible drift is
-therefore mountain mist rather than cloud, and the effect is 27x stronger than
-that first attempt. The one thing they must not do is
+therefore mountain mist rather than cloud.
+
+Wisp size, count and opacity were swept against a pixel readback of the canvas
+overlay rather than judged by eye, because judging vapour by eye on a pale
+painting is exactly what went wrong twice. Too wide and the sides white out — at
+0.30 panel-widths the right of the frame measured 98% covered, which erases the
+painting instead of veiling it. The settled values put peaks near 0.8 alpha with
+a fifth to a third of the area meaningfully covered: distinct drifting banks, with
+the landscape still showing through. The one thing they must not do is
 pass over the painted pavilion: the backdrop is a CSS background *behind* the
 canvas, so anything drawn here sits on top of the gateway's roof, and a wisp
 crossing it would read as fog inside the building rather than behind it. The

@@ -16,7 +16,7 @@ import { PuffField } from "./puffs.js";
 const TAU = Math.PI * 2;
 
 export class Clouds {
-  constructor(count = 96) {
+  constructor(count = 140) {
     this.count = count;
     this.band = null;
 
@@ -24,8 +24,11 @@ export class Clouds {
       // Soft-edged but with real substance at the core. At half this strength
       // the texture halved an already-low per-wisp alpha and the whole effect
       // measured under 1% of a change on screen.
-      stops: [[0, 0.95], [0.3, 0.6], [0.6, 0.26], [0.85, 0.07], [1, 0]],
-      color: 0xfffefa,
+      stops: [[0, 1.0], [0.35, 0.72], [0.65, 0.34], [0.88, 0.09], [1, 0]],
+      // A touch cool rather than the paper-white of the spray. Against a warm
+      // cream sky and green hills a neutral white barely separates; the slight
+      // blue is what makes it read as air rather than as a lightened patch.
+      color: 0xf3f8fc,
       renderOrder: 1,
     });
 
@@ -90,7 +93,7 @@ export class Clouds {
 
       // Thin out toward the top of the band, where the sky is palest.
       const height = (y - b.bottom) / Math.max(1e-6, b.top - b.bottom);
-      const vertical = 1 - Math.max(0, Math.min(1, height)) * 0.45;
+      const vertical = 1 - Math.max(0, Math.min(1, height)) * 0.25;
 
       const alpha = this.gain[i] * vertical * this.#mask(this.x[i]);
       this.field.set(i, this.x[i], y, this.w[i] / 2, this.h[i] / 2, alpha);
