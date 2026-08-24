@@ -173,6 +173,20 @@ roof's dense red was measured at x 0.306–0.694, and each wisp is faded to noth
 across a slightly wider span, so cloud dissolves before reaching it and reappears
 on the far side.
 
+**Legibility.**
+Three things carry the text against a bright, busy painting:
+
+- The ink is near-black rather than the soft brown it began as.
+- The grid is coarser — 31 strands of 30 letters rather than 38 of 42. Glyph size
+  follows the across-curtain spacing, so the only way to grow the letters is to
+  divide the same opening into fewer strands. Rows had to open up with them:
+  grown without that, a glyph's inked height exactly equalled the row pitch and
+  the text stacked into a solid block.
+- A translucent screen fills the gateway behind the letters. It ends exactly on
+  the pillars and the beam, so it reads as paper hung in the gate rather than a
+  panel floating over the painting, and it is sheer enough that the river and
+  mountains still show through.
+
 **`src/lib/glyph-atlas.js` + `src/lib/scene.js` — the curtain.**
 Every distinct character is packed into a single canvas atlas, so the whole
 curtain draws in **one draw call** rather than one per letter. Each glyph is a

@@ -4,8 +4,11 @@ import { buildGlyphAtlas } from "./glyph-atlas.js";
 import { Mist } from "./mist.js";
 import { Clouds } from "./clouds.js";
 
-const COLS = 38;
-const ROWS = 48;
+const COLS = 31;
+// Rows are set so the inked height of a glyph clears the spacing between them.
+// Growing the letters without also opening the rows made ink height and row
+// pitch identical, which stacks the text into a solid block.
+const ROWS = 36;
 
 const WORLD_HEIGHT = 10;
 const BACKDROP_ASPECT = 1700 / 925;
@@ -73,7 +76,20 @@ const WATERFALLS = [
 
 const CURTAIN_TEXT = "THE STRINGS REMEMBER EVERY HAND THAT HAS PASSED THROUGH THEM ";
 
-const REST_COLOR = new THREE.Color("#4a4235");
+const REST_COLOR = new THREE.Color("#241f18");
+
+/**
+ * A translucent screen set in the gateway, behind the letters.
+ *
+ * The backdrop behind the opening is a bright, busy landscape, and small dark
+ * glyphs over it lose their edges against the water and the lit sky. The screen
+ * gives them a calm ground to sit on. It fills the opening exactly — its edges
+ * land on the pillars and the beam — so it reads as a paper screen hung in the
+ * gate rather than as a panel floating over the painting, and it is sheer enough
+ * that the river and mountains still show through it.
+ */
+const SCRIM_COLOR = 0xfaf5ea;
+const SCRIM_OPACITY = 0.38;
 const RING_COLOR = new THREE.Color("#c8922f");
 
 // --- cloth tuning, all expressed against cell size so it survives a resize ---
@@ -172,6 +188,7 @@ export class TempleStrings {
 
     this.accumulator = 0;
 
+    this.#buildScrim();
     this.#buildCurtain();
     this.mist = new Mist();
     this.scene.add(this.mist.mesh);
@@ -201,6 +218,21 @@ export class TempleStrings {
 
   attachAudio(chime) {
     this.chime = chime;
+  }
+
+  #buildScrim() {
+    this.scrim = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({
+        color: SCRIM_COLOR,
+        transparent: true,
+        opacity: SCRIM_OPACITY,
+        depthTest: false,
+        depthWrite: false,
+      })
+    );
+    this.scrim.renderOrder = 1; // over the backdrop, under the letters
+    this.scene.add(this.scrim);
   }
 
   #buildCurtain() {
@@ -333,6 +365,10 @@ export class TempleStrings {
     const top = (0.5 - GATE.top) * this.panelHeight;
     const bottom = (0.5 - GATE.bottom) * this.panelHeight;
     const span = right - left;
+
+    // The screen fills the opening exactly, so its edges meet the architecture.
+    this.scrim.scale.set(right - left, top - bottom, 1);
+    this.scrim.position.set((left + right) / 2, (top + bottom) / 2, 0);
 
     this.cellW = span / (COLS - 1);
     this.cellH = (top - bottom) / (ROWS - 1) / DRAPE_SLACK;
@@ -666,6 +702,9 @@ export class TempleStrings {
     this.container.removeEventListener("pointerdown", this.onPointerDown);
     this.container.removeEventListener("pointerleave", this.onPointerLeave);
     window.removeEventListener("pointerup", this.onPointerUp);
+
+    this.scrim.geometry.dispose();
+    this.scrim.material.dispose();
 
     this.curtain.geometry.dispose();
     this.curtain.material.dispose();

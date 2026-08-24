@@ -6,7 +6,7 @@
  * is what lets a ringing strand warm toward gold without needing its own
  * material.
  */
-export function buildGlyphAtlas(text, cell = 72) {
+export function buildGlyphAtlas(text, cell = 96) {
   const glyphs = [...new Set(text)].filter((c) => c.trim().length > 0);
 
   const cols = Math.ceil(Math.sqrt(glyphs.length));
@@ -17,7 +17,7 @@ export function buildGlyphAtlas(text, cell = 72) {
   canvas.height = rows * cell;
 
   const ctx = canvas.getContext("2d");
-  ctx.font = `700 ${Math.floor(cell * 0.66)}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+  ctx.font = `800 ${Math.floor(cell * 0.7)}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#ffffff";
